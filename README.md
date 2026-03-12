@@ -7,16 +7,16 @@
 # Identificação
 
 - **Título do Projeto:**  
-  Nome claro e específico do sistema.
+  Schedio drasis
 
 - **Linha de Projeto (Direction):**  
-  Web / Mobile / IA / IoT / Jogos / Plataforma / Dados
+  Aplicação Web
 
 - **Autor:**  
-  Nome completo
+  Alexandre Sebastian Basso Muller
 
 - **Data da Proposta:**  
-  DD/MM/AAAA
+13/03/2026
 
 - **Versão:**  
   1.0
