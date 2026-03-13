@@ -7,7 +7,7 @@
 # Identificação
 
 - **Título do Projeto:**  
-  Schedio drasis
+  Schedio Drasis
 
 - **Linha de Projeto (Direction):**  
   Aplicação Web
@@ -28,6 +28,7 @@
 O objetivo desta seção é responder uma pergunta fundamental:
 
 **Este projeto resolve um problema real ou é apenas um exercício técnico?**
+O desenvolvimento da aplicação Web (Schedio Drasis) tem como objetivo providenciar uma área onde escritores possam publicar suas histórias ou artigos, de acordo com sua preferência, sendo esses disponíveis ao público ou mantido de maneira privada, neste caso servindo também para desenvolvedores que buscam elaborar protótipos de seus projetos 
 
 ---
 
@@ -48,6 +49,18 @@ Sempre que possível apresente:
 - prints de processos atuais
 - descrições de fluxos existentes
 
+Atualmente, não se encontram facilmente aplicativos ou plataformas que proporcionem ao escritor plena liberdade sobre sua obra, permitindo também disponibilizá-la ao público de forma interativa. Um gênero conhecido como “interactive fiction” consiste justamente na possibilidade de o público interagir em tempo real com o conteúdo apresentado na tela, podendo alterar o rumo da história.
+
+Além disso, em contextos informativos, como artigos, o leitor poderia especificar ou aprofundar determinadas informações por meio de imagens adicionais ou ser redirecionado para tópicos mais específicos relacionados ao conteúdo apresentado.
+
+Como consequência, essa liberdade de criação e interação também pode beneficiar desenvolvedores e designers de UI/UX, especialmente durante a fase de prototipagem de projetos desenvolvidos em equipe. Nesse cenário, o ambiente de desenvolvimento pode se assemelhar a ferramentas colaborativas como o Figma, permitindo que diversas pessoas trabalhem simultaneamente em um mesmo projeto.
+
+A ideia de uma aplicação voltada à criação de histórias interativas não é inédita. Ela é inspirada em aplicações já existentes, como Storyfall, Squiffy e Netstory, que, embora não sejam amplamente populares ou possuam focos mais específicos, apresentam funcionalidades relevantes para essa área.
+
+Entretanto, a mesclagem e simplificação dessas ferramentas, combinadas com conceitos presentes em aplicações como Figma, Penpot e Adobe XD, constituem um diferencial deste projeto.
+
+O objetivo desta proposta não é substituir nenhuma dessas tecnologias. Pelo contrário, busca-se agregar valor à área de desenvolvimento de projetos pessoais, podendo inclusive servir como uma porta de entrada para o uso dessas ferramentas mais complexas, oferecendo inicialmente uma abordagem mais simples, intuitiva e acessível ao público.
+
 ---
 
 ## 1.2 Origem da Demanda e Evidências
@@ -57,100 +70,128 @@ Sempre que possível apresente:
 Apresente pelo menos **uma evidência concreta**.
 
 ### Demanda Externa
-
-Projeto solicitado por:
-
-- empresa
-- ONG
-- órgão público
-- grupo de usuários
-
-Inclua:
-
-- nome da organização
-- contexto da demanda
-- descrição do problema relatado
-
----
-
 ### Pesquisa com Usuários
 
-Pode incluir:
+Para justificar o impacto do projeto proposto para desenvolvimento, foi realizada uma enquete com diversas perguntas disponibilizadas ao público, com o objetivo de coletar feedback e sugestões dos participantes.
 
-- entrevistas
-- questionários
-- observação de processos
+Entre as perguntas presentes no questionário, uma delas foi: “Você costuma utilizar o Figma para outras funções além da criação de protótipos de projetos envolvendo desenvolvimento de software?”. Os resultados indicaram que 85,7% dos participantes responderam “não”, enquanto 14,3% responderam “sim”.
 
-Inclua:
+Esse resultado pode indicar que uma grande parcela dos usuários utiliza o Figma exclusivamente para sua proposta principal, ou ainda que parte do público considera a ferramenta complexa de utilizar, o que pode limitar sua aplicação em outros contextos.
 
-- número de pessoas entrevistadas
-- principais dores identificadas
-- padrões observados
+Esse cenário também se relaciona com outro questionamento presente na enquete: “Você utilizaria uma nova versão mais simplificada do Figma e totalmente gratuita?”. O resultado obtido foi expressivo, com 100% dos participantes respondendo “sim”.
 
-Adicione **tabelas, gráficos ou prints**.
+Esse resultado pode estar relacionado a mudanças recentes em algumas funcionalidades do Figma, especialmente no setor de prototipagem, que passaram a fazer parte de planos pagos. Essa alteração pode ter dificultado o processo de desenvolvimento para diversos usuários, principalmente aqueles que utilizam a ferramenta para projetos pessoais ou acadêmicos.
 
----
+A seguir, apresenta-se um exemplo de feedback fornecido por um dos participantes da pesquisa:
 
-### Evidência de Interesse
+- “Muitas das ferramentas disponíveis no Figma não são intuitivas. Demorei muito tempo para conseguir utilizar a plataforma e só consegui melhorar minhas habilidades depois de assistir a vídeos de outras pessoas demonstrando como realizar determinados processos.”
 
-Podem ser incluídos:
-
-- cartas de intenção
-- feedback de usuários
-- comentários de comunidades
-- resultados de formulários
+Esse tipo de retorno reforça a percepção de que, embora o Figma seja uma ferramenta poderosa e amplamente utilizada no desenvolvimento de interfaces, sua curva de aprendizado pode representar um obstáculo para novos usuários, especialmente aqueles que estão iniciando na área de design ou prototipagem.
 
 ---
 
 ## 1.3 Análise de Soluções Existentes (Benchmark)
 
-Investigue **3 a 5 soluções existentes** que tentam resolver o mesmo problema.
+### 1. Storyfall
 
-Para cada solução apresente:
+Link: https://storyfall.com
 
-- nome do produto
-- link
-- público-alvo
-- funcionalidades principais
-- limitações
+Público-alvo:
+Escritores independentes e criadores de conteúdo que desejam publicar histórias interativas para o público.
 
-Inclua **prints da interface ou diagramas simplificados**.
+Funcionalidades principais:
 
----
+- Criação de histórias com múltiplos caminhos narrativos
+- Sistema de escolhas para o leitor
+- Publicação online de histórias
+- Possibilidade de monetização de conteúdo
+
+Limitações:
+
+- Interface focada apenas na narrativa
+- Poucas ferramentas visuais para organização de histórias complexas
+- Ausência de recursos avançados de colaboração em equipe
+
+### 2. Squiffy
+
+Link: https://squiffystory.com
+
+Público-alvo:
+Autores de ficção interativa e desenvolvedores interessados em criar narrativas ramificadas.
+
+Funcionalidades principais:
+
+- Criação de histórias com escolhas e múltiplos finais
+- Estrutura baseada em texto e links narrativos
+- Exportação de histórias em formato HTML
+- Ferramenta gratuita e open source
+
+Limitações:
+
+- Interface pouco intuitiva para iniciantes
+- Pouco suporte a elementos visuais e multimídia
+- Não possui recursos colaborativos em tempo real---
+
+### 3. Figma
+
+Link: https://www.figma.com
+
+Público-alvo:
+Designers UI/UX, desenvolvedores e equipes de produto.
+
+Funcionalidades principais:
+
+- Design de interfaces digitais
+- Prototipagem interativa
+- Colaboração em tempo real
+- Compartilhamento e feedback de projetos
+
+Limitações:
+
+- Não voltado para criação narrativa
+- Algumas funcionalidades importantes são pagas
+- Curva de aprendizado relativamente elevada para iniciantes
 
 ### Comparação
-
-| Solução | Pontos Fortes | Limitações |
-|---|---|---|
-
----
+| Solução   | Pontos Fortes                            | Limitações                                  |
+| --------- | ---------------------------------------- | ------------------------------------------- |
+| Squiffy   | Open source e exportação em HTML         | Interface complexa e pouco intuitiva        |
+| Netstory  | Experiência narrativa interativa         | Pouca flexibilidade e ferramentas limitadas |
+| Figma     | Colaboração em tempo real e prototipagem | Não voltado para narrativa                  |
 
 ### Diferencial do Projeto
 
-Explique claramente:
+A criação desta nova plataforma busca preencher lacunas identificadas nas soluções analisadas.
 
-- por que criar algo novo
-- qual lacuna não foi resolvida pelas soluções existentes
-- qual nicho específico será atendido
+Atualmente, as ferramentas disponíveis se dividem em dois grupos principais: plataformas focadas na criação de histórias interativas e ferramentas voltadas para design e prototipagem colaborativa. No entanto, não existe uma solução que combine de forma simples e intuitiva essas duas abordagens.
+
+O projeto proposto pretende unir essas funcionalidades em uma única plataforma, permitindo que usuários criem histórias interativas, artigos dinâmicos ou estruturas narrativas complexas, utilizando um ambiente visual semelhante ao de ferramentas de design colaborativo.
+
+O nicho específico atendido pelo projeto inclui escritores, criadores de conteúdo digital, designers e equipes de desenvolvimento que desejam estruturar narrativas interativas ou fluxos de informação de forma visual e colaborativa.
 
 ---
 
 ## 1.4 Público-Alvo
 
-Defina quem usará o sistema.
+O sistema será voltado principalmente para usuários interessados em criação de conteúdo interativo e colaboração em projetos narrativos ou de design.
 
-Exemplos:
+### Os principais usuários do sistema incluem:
 
-- estudantes
-- contadores
-- equipes de suporte
-- jogadores
+- escritores e autores de ficção interativa
+- estudantes e criadores de conteúdo digital
+- designers de UI/UX
+- desenvolvedores que desejam prototipar fluxos narrativos ou experiências interativas
 
-Descreva:
+### Contexto de uso
 
-- perfil do usuário
-- contexto de uso
-- nível de conhecimento técnico esperado
+A plataforma poderá ser utilizada em diferentes contextos, como:
+
+- criação de histórias interativas
+- desenvolvimento de protótipos narrativos para jogos
+- organização de ideias e fluxos de informação
+- produção de conteúdo educacional ou informativo com navegação interativa
+
+O sistema será projetado para atender tanto usuários iniciantes quanto usuários intermediários, priorizando uma interface simples e intuitiva. Dessa forma, não será necessário conhecimento avançado em programação para utilizar a plataforma.
 
 ---
 
@@ -158,32 +199,27 @@ Descreva:
 
 ### Objetivo Geral
 
-Qual transformação o projeto pretende gerar.
+Desenvolver uma plataforma digital que permita a criação, organização e publicação de histórias e conteúdos interativos, oferecendo um ambiente colaborativo inspirado em ferramentas de design visual.
 
 ---
 
 ### Objetivos Específicos
 
-Liste **3 a 5 objetivos técnicos ou de produto**.
-
-Exemplo:
-
-- automatizar um processo manual
-- permitir análise de dados
-- criar um sistema de recomendação
+- Desenvolver um editor visual baseado em nós para criação de narrativas interativas
+- Permitir colaboração em tempo real entre múltiplos usuários
+- Criar um sistema de navegação interativa para os leitores
+- Disponibilizar uma interface simples e acessível para usuários iniciantes
+- Permitir a privatização de Prototipazem 
 
 ---
 
 ## 1.6 Métricas de Sucesso (KPIs)
 
-Como saberemos que o projeto foi bem sucedido?
-
-Exemplos:
-
-- latência inferior a 200ms
-- acurácia da IA superior a 85%
-- suporte a 100 usuários simultâneos
-- redução do tempo de um processo em 30%
+- Tempo médio de carregamento inferior a 2 segundos
+- Suporte a pelo menos 100 usuários simultâneos na plataforma
+- Separação precisa de desenvolvedor para telespectador 
+- Nível de satisfação dos usuários superior a 80% em avaliações da plataforma
+- feedback positivo de 80% dos usuários referentes ao desenvolvimento  
 
 ---
 
