@@ -76,9 +76,12 @@ Para justificar o impacto do projeto proposto para desenvolvimento, foi realizad
 
 Entre as perguntas presentes no questionário, uma delas foi: “Você costuma utilizar o Figma para outras funções além da criação de protótipos de projetos envolvendo desenvolvimento de software?”. Os resultados indicaram que 85,7% dos participantes responderam “não”, enquanto 14,3% responderam “sim”.
 
+![imagem exeplo](Screenshots/Resultado1)
+
 Esse resultado pode indicar que uma grande parcela dos usuários utiliza o Figma exclusivamente para sua proposta principal, ou ainda que parte do público considera a ferramenta complexa de utilizar, o que pode limitar sua aplicação em outros contextos.
 
 Esse cenário também se relaciona com outro questionamento presente na enquete: “Você utilizaria uma nova versão mais simplificada do Figma e totalmente gratuita?”. O resultado obtido foi expressivo, com 100% dos participantes respondendo “sim”.
+![imagem exeplo](Screenshots/Resultado2)
 
 Esse resultado pode estar relacionado a mudanças recentes em algumas funcionalidades do Figma, especialmente no setor de prototipagem, que passaram a fazer parte de planos pagos. Essa alteração pode ter dificultado o processo de desenvolvimento para diversos usuários, principalmente aqueles que utilizam a ferramenta para projetos pessoais ou acadêmicos.
 
@@ -92,25 +95,26 @@ Esse tipo de retorno reforça a percepção de que, embora o Figma seja uma ferr
 
 ## 1.3 Análise de Soluções Existentes (Benchmark)
 
-### 1. Storyfall
+### 1. Netstory
 
-Link: https://storyfall.com
+Link: https://netstory.io
 
 Público-alvo:
-Escritores independentes e criadores de conteúdo que desejam publicar histórias interativas para o público.
+Criadores de histórias digitais e leitores interessados em experiências narrativas interativas.
 
 Funcionalidades principais:
 
-- Criação de histórias com múltiplos caminhos narrativos
-- Sistema de escolhas para o leitor
-- Publicação online de histórias
-- Possibilidade de monetização de conteúdo
+- Criação de histórias interativas
+- Navegação por escolhas durante a leitura
+- Compartilhamento de conteúdo com o público
 
 Limitações:
 
-- Interface focada apenas na narrativa
-- Poucas ferramentas visuais para organização de histórias complexas
-- Ausência de recursos avançados de colaboração em equipe
+- Ecossistema limitado de ferramentas de edição
+- Baixa flexibilidade para projetos mais complexos
+- Falta de recursos voltados para prototipagem ou design de interfaces
+
+![imagem exeplo](Screenshots/Netstory)
 
 ### 2. Squiffy
 
@@ -132,6 +136,8 @@ Limitações:
 - Pouco suporte a elementos visuais e multimídia
 - Não possui recursos colaborativos em tempo real---
 
+  ![imagem exeplo](Screenshots/Squiffy)
+
 ### 3. Figma
 
 Link: https://www.figma.com
@@ -151,6 +157,8 @@ Limitações:
 - Não voltado para criação narrativa
 - Algumas funcionalidades importantes são pagas
 - Curva de aprendizado relativamente elevada para iniciantes
+
+  ![imagem exeplo](Screenshots/figma)
 
 ### Comparação
 | Solução   | Pontos Fortes                            | Limitações                                  |
