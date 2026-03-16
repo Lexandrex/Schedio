@@ -233,9 +233,89 @@ Desenvolver uma plataforma digital que permita a criação, organização e publ
 
 # 2. Engenharia de Requisitos
 
-Esta seção define **o que o sistema fará**.
+# 2.3 Requisitos Funcionais (RF)
+# Usuário
+Requisitos relacionados à criação e gerenciamento de contas de usuário.
+| ID    | Requisito                                                                           |
+| ----- | ----------------------------------------------------------------------------------- |
+| RF-01 | O sistema deve permitir a **criação de usuário**                                    |
+| RF-02 | O sistema deve permitir **login de usuário**                                        |
+| RF-03 | O sistema deve permitir **recuperação de senha por e-mail**                         |
+| RF-04 | O sistema deve permitir **edição do e-mail da conta**                               |
+| RF-05 | O sistema deve permitir **escolher a categoria da sessão (Editor / Telespectador)** |
+| RF-06 | O sistema deve permitir **trocar a categoria durante a sessão**                     |
 
-Evite descrições vagas.
+## Navegação de Projetos
+Requisitos relacionados à exploração e descoberta de projetos.
+| ID    | Requisito                                                     |
+| ----- | ------------------------------------------------------------- |
+| RF-07 | O sistema deve permitir **navegar entre projetos**            |
+| RF-08 | O sistema deve permitir **filtrar projetos**                  |
+| RF-09 | O sistema deve permitir **visualizar projetos publicados**    |
+| RF-10 | O sistema deve permitir **buscar projetos por palavra-chave** |
+
+# Editor
+## Gerenciamento de Projeto
+| ID    | Requisito                                                                       |
+| ----- | ------------------------------------------------------------------------------- |
+| RF-11 | O sistema deve permitir **criar projetos**                                      |
+| RF-12 | O sistema deve permitir **editar projetos existentes**                          |
+| RF-13 | O sistema deve permitir **salvar projetos manualmente**                         |
+| RF-14 | O sistema deve realizar **salvamento automático a cada 10 segundos**            |
+| RF-15 | O sistema deve permitir **publicar projetos**                                   |
+| RF-16 | O sistema deve permitir **privatizar projetos**                                 |
+| RF-17 | O sistema deve permitir **excluir projetos**                                    |
+| RF-18 | O sistema deve permitir **gerar links de visualização, colaboração ou preview** |
+
+## Ferramentas de Edição
+| ID    | Requisito                                                                |
+| ----- | ------------------------------------------------------------------------ |
+| RF-19 | O sistema deve permitir **criação e edição de formas**                   |
+| RF-20 | O sistema deve permitir **desenhar utilizando a ferramenta pincel**      |
+| RF-21 | O sistema deve permitir **selecionar múltiplos objetos simultaneamente** |
+| RF-22 | O sistema deve permitir **alterar cores de elementos gráficos**          |
+| RF-23 | O sistema deve permitir **inserção e edição de texto**                   |
+| RF-24 | O sistema deve permitir **adição de imagens ao projeto**                 |
+| RF-25 | O sistema deve permitir **edição de imagens inseridas**                  |
+
+## Estrutura e Navegação
+| ID    | Requisito                                                              |
+| ----- | ---------------------------------------------------------------------- |
+| RF-26 | O sistema deve permitir **criação de telas dentro do projeto**         |
+| RF-27 | O sistema deve permitir **edição de telas**                            |
+| RF-28 | O sistema deve permitir **navegação entre telas**                      |
+| RF-29 | O sistema deve permitir **visualização do mapa estrutural do projeto** |
+| RF-30 | O sistema deve permitir **zoom no mapa do projeto**                    |
+| RF-31 | O sistema deve permitir **alterar cor do mapa**                        |
+
+## prototipagem 
+| ID    | Requisito                                                                              |
+| ----- | -------------------------------------------------------------------------------------- |
+| RF-32 | O sistema deve permitir **criar transições entre telas**                               |
+| RF-33 | O sistema deve permitir **navegação entre telas utilizando a ferramenta de protótipo** |
+| RF-34 | O sistema deve permitir **simular navegação interativa do projeto**                    |
+
+# Telespectador
+| ID    | Requisito                                                          |
+| ----- | ------------------------------------------------------------------ |
+| RF-35 | O sistema deve permitir **visualizar projetos publicados**         |
+| RF-36 | O sistema deve permitir **comentar em projetos**                   |
+| RF-37 | O sistema deve permitir **favoritar projetos**                     |
+| RF-38 | O sistema deve permitir **dar like em projetos**                   |
+| RF-39 | O sistema deve permitir **reportar projetos**                      |
+| RF-40 | O sistema deve permitir **salvar projetos para leitura posterior** |
+| RF-41 | O sistema deve permitir **compartilhar projetos**                  |
+
+## 2.4 Requisitos Não Funcionais (RNF)
+| ID     | Requisito                                                            |
+| ------ | ------------------------------------------------------------------   |
+| RNF-01 | O sistema deve possuir **tempo de resposta inferior a 2 segundos**   |
+| RNF-02 | O sistema deve suportar **no mínimo 100 usuários simultâneos**       |
+| RNF-03 | Senhas devem ser **armazenadas com criptografia segura**             |
+| RNF-04 | O sistema deve possuir **controle de acesso baseado em permissões**  |
+| RNF-05 | O sistema deve funcionar nos **principais navegadores modernos**     |
+| RNF-06 | O sistema deve ser **responsivel com dispositivos desktop e mobile** |
+
 
 ---
 
