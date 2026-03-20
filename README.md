@@ -233,6 +233,63 @@ Desenvolver uma plataforma digital que permita a criação, organização e publ
 
 # 2. Engenharia de Requisitos
 
+## 2.1 Personas
+
+## 👥 2.1 Personas
+
+###  Ana — Escritora
+
+- **Contexto:** Ana é uma estudante de lestras que gosta de escrever histórias interativas e artigos
+- **Objetivos:**
+  - Criar histórias com múltiplos caminhos
+  - Publicar conteúdo  
+- **Dificuldades:**
+  - Ferramentas complexas
+  - Opções não dinamicas
+  - Dificuldade em organizar narrativa  
+
+---
+
+###  Lucas — Designer
+
+- **Contexto:** Lucas faz parte de uma equipe do setor de UI/UX de uma empresa
+- **Objetivos:**
+  - Criar protótipos  
+  - Colaborar com equipe  
+- **Dificuldades:**
+  - Curva de aprendizado  
+  - Limitações de plano gratuito  
+
+---
+
+###  Rafael — Leitor
+
+- **Contexto:** Consumidor de histórias  
+- **Objetivos:**
+  - Explorar histórias interativas  
+- **Dificuldades:**
+  - Poucas plataformas  
+  - Conteúdo desorganizado  
+
+
+
+---
+
+## 2.2 Casos de Uso Principais
+
+Liste os principais fluxos do sistema.
+
+Exemplo:
+
+- criar conta
+- registrar dados
+- consultar informações
+- gerar relatórios
+
+Sempre que possível inclua **diagramas de caso de uso**.
+
+---
+
 # 2.3 Requisitos Funcionais (RF)
 # Usuário
 Requisitos relacionados à criação e gerenciamento de contas de usuário.
@@ -315,71 +372,6 @@ Requisitos relacionados à exploração e descoberta de projetos.
 | RNF-04 | O sistema deve possuir **controle de acesso baseado em permissões**  |
 | RNF-05 | O sistema deve funcionar nos **principais navegadores modernos**     |
 | RNF-06 | O sistema deve ser **responsivel com dispositivos desktop e mobile** |
-
-
----
-
-## 2.1 Personas
-
-Crie **1 a 3 personas principais**.
-
-Inclua:
-
-- nome fictício
-- contexto
-- objetivos
-- principais dificuldades
-
-Adicionar **imagens ou ilustrações** pode ajudar na compreensão.
-
----
-
-## 2.2 Casos de Uso Principais
-
-Liste os principais fluxos do sistema.
-
-Exemplo:
-
-- criar conta
-- registrar dados
-- consultar informações
-- gerar relatórios
-
-Sempre que possível inclua **diagramas de caso de uso**.
-
----
-
-## 2.3 Requisitos Funcionais (RF)
-
-Use a estrutura:
-
-> O sistema deve permitir que **[ator] realize [ação]**.
-
-Exemplo:
-
-RF01 — O sistema deve permitir que o usuário crie uma conta.
-
-RF02 — O sistema deve permitir que o usuário registre informações.
-
-RF03 — O sistema deve permitir que o usuário visualize dados registrados.
-
----
-
-## 2.4 Requisitos Não Funcionais (RNF)
-
-Inclua requisitos relacionados a:
-
-- desempenho
-- segurança
-- disponibilidade
-- escalabilidade
-- usabilidade
-
-Exemplo:
-
-RNF01 — O sistema deve suportar 100 usuários simultâneos.  
-RNF02 — O tempo de resposta deve ser inferior a 300ms.  
-RNF03 — O sistema deve utilizar autenticação segura.
 
 ---
 
