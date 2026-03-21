@@ -235,8 +235,6 @@ Desenvolver uma plataforma digital que permita a criação, organização e publ
 
 ## 2.1 Personas
 
-## 👥 2.1 Personas
-
 ###  Ana — Escritora
 
 - **Contexto:** Ana é uma estudante de lestras que gosta de escrever histórias interativas e artigos
@@ -264,12 +262,23 @@ Desenvolver uma plataforma digital que permita a criação, organização e publ
 
 ###  Rafael — Leitor
 
-- **Contexto:** Consumidor de histórias  
+- **Contexto:** Consumidor de histórias criadas pelos amigos 
 - **Objetivos:**
-  - Explorar histórias interativas  
+  - Explorar histórias interativas
+  - Incentivar a criação de novos conteudos 
 - **Dificuldades:**
   - Poucas plataformas  
-  - Conteúdo desorganizado  
+  - Conteúdo desorganizado
+
+###  Gabriel — Estudante
+
+- **Contexto:** Devo criar uma apresentação sobre determinado assunto da faculdade utilizando uma nova ferramenta de elaboração de slides
+- **Objetivos:**
+  - Elaborar uma apresentação em equipe
+  - Explorar novas ferramentas
+- **Dificuldades:**
+  - Poucas plataformas  
+  - Opções tradicionais pouco intuitivas 
 
 
 
