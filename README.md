@@ -7,7 +7,7 @@
 # Identificação
 
 - **Título do Projeto:**  
-  Schedio Drasis
+Schedio Drasis
 
 - **Linha de Projeto (Direction):**  
   Aplicação Web
@@ -25,9 +25,6 @@
 
 # 1. Visão do Produto e Impacto (O Problema)
 
-O objetivo desta seção é responder uma pergunta fundamental:
-
-**Este projeto resolve um problema real ou é apenas um exercício técnico?**
 O desenvolvimento da aplicação Web (Schedio Drasis) tem como objetivo providenciar uma área onde escritores possam publicar suas histórias ou artigos, de acordo com sua preferência, sendo esses disponíveis ao público ou mantido de maneira privada, neste caso servindo também para desenvolvedores que buscam elaborar protótipos de seus projetos 
 
 ---
@@ -69,7 +66,8 @@ O objetivo desta proposta não é substituir nenhuma dessas tecnologias. Pelo co
 
 Apresente pelo menos **uma evidência concreta**.
 
-### Demanda Externa
+---
+
 ### Pesquisa com Usuários
 
 Para justificar o impacto do projeto proposto para desenvolvimento, foi realizada uma enquete com diversas perguntas disponibilizadas ao público, com o objetivo de coletar feedback e sugestões dos participantes.
@@ -94,8 +92,6 @@ Esse tipo de retorno reforça a percepção de que, embora o Figma seja uma ferr
 ---
 
 ## 1.3 Análise de Soluções Existentes (Benchmark)
-
-### 1. Netstory
 
 Link: https://netstory.io
 
@@ -227,7 +223,7 @@ Desenvolver uma plataforma digital que permita a criação, organização e publ
 - Suporte a pelo menos 100 usuários simultâneos na plataforma
 - Separação precisa de desenvolvedor para telespectador 
 - Nível de satisfação dos usuários superior a 80% em avaliações da plataforma
-- feedback positivo de 80% dos usuários referentes ao desenvolvimento  
+- feedback positivo de 80% dos usuários referentes ao desenvolvimento
 
 ---
 
@@ -295,11 +291,25 @@ Exemplo:
 - consultar informações
 - gerar relatórios
 
+---
+
+## 2.2 Casos de Uso Principais
+
+Liste os principais fluxos do sistema.
+
+Exemplo:
+
+- criar conta
+- registrar dados
+- consultar informações
+- gerar relatórios
+
 Sempre que possível inclua **diagramas de caso de uso**.
 
 ---
 
-# 2.3 Requisitos Funcionais (RF)
+## 2.3 Requisitos Funcionais (RF)
+
 # Usuário
 Requisitos relacionados à criação e gerenciamento de contas de usuário.
 | ID    | Requisito                                                                           |
@@ -380,7 +390,7 @@ Requisitos relacionados à exploração e descoberta de projetos.
 | RNF-03 | Senhas devem ser **armazenadas com criptografia segura**             |
 | RNF-04 | O sistema deve possuir **controle de acesso baseado em permissões**  |
 | RNF-05 | O sistema deve funcionar nos **principais navegadores modernos**     |
-| RNF-06 | O sistema deve ser **responsivel com dispositivos desktop e mobile** |
+| RNF-06 | O sistema deve ser **responsivel com dispositivos desktop e mobile**
 
 ---
 
