@@ -284,25 +284,25 @@ Desenvolver uma plataforma digital que permita a criação, organização e publ
 
 Liste os principais fluxos do sistema.
 
-Exemplo:
-
-- criar conta
-- registrar dados
-- consultar informações
-- gerar relatórios
-
----
-
-## 2.2 Casos de Uso Principais
-
-Liste os principais fluxos do sistema.
-
-Exemplo:
-
-- criar conta
-- registrar dados
-- consultar informações
-- gerar relatórios
+### Usuário
+- Registrar-se
+- Logar
+- Escolher categoria de login (escritor/leitor)
+### Leitor
+- Filtrar por obras
+- Visualizar obra
+- Favoritar obra
+- Marcar obra para leitura depois
+### Escritor 
+- Criar um novo projeto
+- Definir equipe
+- Selecionar formas
+- Definir fluxo
+- Editar texto
+- Publicar
+- definir categoria (privada/publica)
+- 
+![imagem exeplo](Screenshots/casodeuso)
 
 Sempre que possível inclua **diagramas de caso de uso**.
 
