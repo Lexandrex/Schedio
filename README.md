@@ -304,8 +304,6 @@ Liste os principais fluxos do sistema.
 - 
 ![imagem exeplo](Screenshots/casodeuso)
 
-Sempre que possível inclua **diagramas de caso de uso**.
-
 ---
 
 ## 2.3 Requisitos Funcionais (RF)
@@ -396,19 +394,95 @@ Requisitos relacionados à exploração e descoberta de projetos.
 
 ## 2.5 Regras de Negócio
 
-Exemplos:
+Esta seção define as regras que controlam o comportamento do sistema.
 
-- apenas usuários autenticados podem acessar determinados recursos
-- determinadas operações exigem validação adicional
+## Usuário
+
+| ID | Regra |
+|----|------|
+| RN-01 | O usuário deve estar autenticado para acessar funcionalidades do sistema |
+| RN-02 | O e-mail do usuário deve ser único no sistema |
+| RN-03 | A troca de categoria (Editor/Telespectador) deve ser permitida apenas durante sessão ativa |
+
+---
+
+## Projetos
+
+| ID | Regra |
+|----|------|
+| RN-04 | Apenas o criador do projeto pode editá-lo sem permissões |
+| RN-05 | Apenas o criador pode excluir um projeto |
+| RN-06 | Projetos privados não podem ser visualizados por outros usuários |
+| RN-07 | Projetos públicos podem ser acessados por qualquer usuário |
+| RN-08 | Um projeto deve possuir ao menos uma tela para ser publicado |
+
+---
+
+## Editor
+
+| ID | Regra |
+|----|------|
+| RN-09 | Apenas usuários com perfil de Editor podem modificar projetos |
+| RN-10 | O sistema deve salvar automaticamente alterações a cada 10 segundos |
+| RN-11 | Não é permitido editar um projeto enquanto estiver em modo de visualização pública |
+| RN-12 | Transições só podem ser criadas entre telas existentes |
+
+---
+
+## Telespectador
+
+| ID | Regra |
+|----|------|
+| RN-13 | Apenas usuários autenticados podem dar "like" |
+| RN-14 | Um usuário pode dar apenas um "like" por projeto |
+| RN-15 | Projetos reportados devem ser analisados posteriormente |
+| RN-16 | Usuários podem favoritar múltiplos projetos |
+
+---
+
+## Compartilhamento e Acesso
+
+| ID | Regra |
+|----|------|
+| RN-17 | Links de compartilhamento devem respeitar a privacidade do projeto |
+| RN-18 | Links de colaboração permitem edição apenas para usuários autorizados |
+| RN-19 | Links de visualização não permitem edição do projeto |
+| RN-20 | Links devem possuir um prazo de validade curto |
 
 ---
 
 ## 2.6 Fora do Escopo
 
-Liste explicitamente **o que o sistema não fará**.
+Esta seção define funcionalidades que **não serão implementadas neste projeto**, com o objetivo de manter o foco, reduzir complexidade e evitar crescimento descontrolado.
 
-Isso ajuda a evitar crescimento descontrolado do projeto.
+---
 
+## Funcionalidades Não Incluídas
+
+| ID | Item fora do escopo | Justificativa |
+|----|--------------------|--------------|
+| FE-01 | Sistema de pagamento e monetização | Aumenta a complexidade e não é essencial para a proposta inicial |
+| FE-02 | Aplicativo mobile nativo (Android/iOS) | O foco será apenas na versão web |
+| FE-03 | Integração com redes sociais externas | Pode ser considerado em versões futuras |
+| FE-04 | Sistema avançado de IA para geração automática de histórias | Fora do escopo inicial devido à complexidade técnica |
+| FE-05 | Edição offline de projetos | Requer sincronização complexa de dados |
+| FE-06 | Controle avançado de permissões (níveis detalhados de acesso) | Apenas permissões básicas serão implementadas |
+| FE-07 | Sistema completo de chat entre usuários | Não é foco principal da plataforma |
+| FE-08 | Marketplace de templates ou projetos | Pode ser explorado futuramente |
+| FE-09 | Suporte a plugins ou extensões externas | Aumenta significativamente a complexidade do sistema |
+| FE-10 | Versionamento avançado estilo Git | Apenas versionamento básico será considerado |
+
+---
+
+## Considerações
+
+Os itens listados poderão ser considerados em versões futuras do sistema, conforme evolução do projeto e validação com usuários.
+
+O foco inicial será:
+
+- criação de histórias interativas  
+- prototipagem visual  
+- colaboração básica entre usuários  
 ---
 
 # 3. Fluxos e Comportamento do Sistema
