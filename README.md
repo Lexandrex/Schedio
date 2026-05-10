@@ -487,34 +487,16 @@ O foco inicial será:
 
 # 3. Fluxos e Comportamento do Sistema
 
-Esta seção demonstra **como o sistema funciona**.
-
-Use diagramas sempre que possível.
-
----
-
 ## 3.1 Fluxo Principal do Usuário
 
-Apresente o fluxo principal do sistema.
+![imagem exeplo](Screenshots/Fluxoprincipal)
 
-Utilize:
-
-- fluxogramas
-- diagramas de atividades
-- diagramas de sequência
-
-Inclua **imagens dos diagramas**.
-
+---
+![imagem exeplo](Screenshots/FluxoprincipalEditor)
 ---
 
 ## 3.2 Fluxos Alternativos
-
-Descreva cenários como:
-
-- erros
-- cancelamentos
-- exceções
-
+![imagem exeplo](Screenshots/FluxoAlternado)
 ---
 
 # 4. Mockups e Experiência do Usuário (UX)
