@@ -622,6 +622,7 @@ O foco agora é o que acontece **dentro de um único container** (como uma API e
     * **Lógica de Negócio:** Componentes que encapsulam as regras específicas do domínio.
     * **Interações:** Como os componentes internos se orquestram para processar e responder a uma requisição.
 ---
+#MONGODB utilizae para salvamente de estado
 
 ## 5.2 Modelo de Dados
 
