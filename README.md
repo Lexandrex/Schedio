@@ -589,40 +589,91 @@ Esta seção demonstra **como o sistema será construído**.
 
 ## 5.1 Diagrama C4
 
-Apresente três níveis.
-## 1. Nível 1: Diagrama de Contexto
-É a **visão macro** do sistema. O foco aqui não é a tecnologia, mas sim como o software se encaixa no ecossistema e no mundo real.
+## Nível 1 — Diagrama de Contexto
 
-* **Objetivo:** Mostrar o sistema como uma "caixa preta" e suas interações básicas com o ambiente externo.
-* **O que incluir:**
-    * **Atores:** Diferentes perfis de usuários (Ex: Cliente, Administrador, Operador).
-    * **Sistemas Externos:** Softwares legados, serviços de terceiros ou provedores de identidade.
-    * **Fluxo de Valor:** Como a informação entra, circula e sai do sistema principal.
+O diagrama de contexto apresenta a visão macro do sistema e suas interações externas.
 
----
+### Atores principais
 
-## 2. Nível 2: Diagrama de Containers
-Neste estágio, damos o primeiro **"zoom"**. Decompomos o sistema em suas unidades de execução independentes (containers).
+- Escritor
+- Telespectador
 
-* **Objetivo:** Apresentar a arquitetura de alto nível e as decisões tecnológicas fundamentais.
-* **O que incluir:**
-    * **Aplicações Web/Mobile:** Interfaces de usuário (Ex: SPA em React, App Android/iOS).
-    * **Serviços de Backend:** Unidades lógicas de processamento (Ex: API Gateway, Microserviços em Node.js ou Go).
-    * **Armazenamento:** Persistência de dados (Ex: PostgreSQL, MongoDB, Redis).
-    * **Protocolos:** Como os containers se comunicam (Ex: JSON/HTTPS, gRPC, RabbitMQ).
+### Sistemas externos
+
+- Banco de dados PostgreSQL
+- Serviço de armazenamento de imagens
+- MongoDB → estado do editor
 
 ---
 
-## 3. Nível 3: Diagrama de Componentes
-O foco agora é o que acontece **dentro de um único container** (como uma API específica ou um serviço de backend).
+![imagem exeplo](Screenshots/FluxoAlternado)
 
-* **Objetivo:** Identificar as responsabilidades internas, padrões de código e a organização lógica.
-* **O que incluir:**
-    * **Estrutura Interna:** Organização das camadas (Ex: Controladores, Serviços, Repositórios e Clientes de API).
-    * **Lógica de Negócio:** Componentes que encapsulam as regras específicas do domínio.
-    * **Interações:** Como os componentes internos se orquestram para processar e responder a uma requisição.
 ---
-#MONGODB utilizae para salvamente de estado
+# 5.2 Diagrama de Containers
+
+O diagrama abaixo apresenta a arquitetura de alto nível do sistema, demonstrando os principais containers responsáveis pela interface, processamento e persistência de dados.
+
+---
+
+## Containers do Sistema
+
+| Container | Tecnologia | Responsabilidade |
+|---|---|---|
+| Frontend Web | React | Interface do usuário |
+| API Backend | Node.js + Express | Regras de negócio e processamento |
+| Banco de Dados | PostgreSQL | Persistência de dados |
+| MongoDB | Banco NoSQL | Estado dos projetos |
+| Storage | Cloudinary | Armazenamento de imagens e assets |
+
+---
+
+## Comunicação
+
+| Origem | Destino | Protocolo |
+|---|---|---|
+| Frontend | API Backend | HTTPS/JSON |
+| API Backend | PostgreSQL | SQL |
+| API Backend | MongoDB | NoSQL |
+| API Backend | Cloudinary | REST API |
+
+---
+
+![Container Diagram](docs/c4/container-diagram.png)
+
+---
+
+# 5.3 Diagrama de Componentes
+
+O diagrama abaixo apresenta a organização interna da API backend do sistema.
+
+A arquitetura foi estruturada utilizando separação em camadas, facilitando manutenção, organização e escalabilidade futura.
+
+---
+
+## Componentes Internos
+
+| Componente | Responsabilidade |
+|---|---|
+| Login Controller | Receber requisições de autenticação |
+| Auth Service | Validar credenciais e regras de autenticação |
+| Token Service | Gerar e validar tokens JWT |
+| User Repository | Persistir dados de usuários |
+| Project Controller | Receber requisições relacionadas aos projetos |
+| Project Service | Aplicar regras de negócio dos projetos |
+| Image Service | Gerenciar upload de imagens |
+| Project Repository | Persistir projetos e dados relacionados |
+
+---
+
+## Fluxo Interno
+
+Controller → Service → Repository → Banco de Dados
+
+---
+
+iamgem
+
+---
 
 ## 5.2 Modelo de Dados
 
@@ -649,16 +700,142 @@ Exemplo:
 
 ---
 
-## 5.4 Stack Tecnológica
 
-Liste as tecnologias utilizadas.
 
-Para cada tecnologia explique **por que ela foi escolhida**.
+# 5.4 Stack Tecnológica
 
-Exemplo:
+Esta seção apresenta as principais tecnologias utilizadas no desenvolvimento do sistema, bem como a justificativa técnica para suas escolhas.
 
-Node.js  
-Escolhido pela capacidade de lidar com alto volume de requisições I/O.
+---
+
+## Frontend
+
+### React
+
+**Categoria:** Biblioteca Frontend
+
+O React foi escolhido pela facilidade na criação de interfaces interativas e componentizadas, permitindo maior organização do código e reutilização de componentes da interface do editor visual.
+
+Também oferece boa integração com APIs REST e gerenciamento eficiente de estados da aplicação.
+
+---
+
+## Backend
+
+### Node.js
+
+**Categoria:** Ambiente de execução JavaScript
+
+O Node.js foi escolhido pela simplicidade de integração com o frontend em JavaScript e pela boa capacidade de lidar com múltiplas requisições assíncronas, tornando-o adequado para aplicações web interativas.
+
+---
+
+### Express.js
+
+**Categoria:** Framework Backend
+
+O Express foi utilizado para facilitar a criação da API REST, gerenciamento de rotas e organização da lógica do servidor.
+
+Sua estrutura simples e flexível torna o desenvolvimento mais rápido para projetos MVP e aplicações de pequeno porte.
+
+---
+
+## Banco de Dados
+
+### PostgreSQL
+
+**Categoria:** Banco de Dados Relacional
+
+O PostgreSQL foi escolhido para armazenar dados estruturados do sistema, como:
+
+- usuários
+- autenticação
+- curtidas
+- permissões
+
+A tecnologia oferece confiabilidade, segurança e suporte a relacionamentos complexos entre entidades.
+
+---
+
+### MongoDB
+
+**Categoria:** Banco de Dados NoSQL
+
+O MongoDB foi utilizado para persistência do estado do editor visual e da estrutura dos projetos interativos.
+
+Sua estrutura orientada a documentos facilita o armazenamento de dados dinâmicos como:
+
+- telas
+- conexões
+- elementos gráficos
+- posicionamento visual
+- estados do projeto
+
+---
+
+## Armazenamento de Imagens
+
+### Cloudinary
+
+**Categoria:** Storage em Nuvem
+
+O Cloudinary foi escolhido para armazenamento de imagens e assets do sistema.
+
+A plataforma oferece:
+
+- hospedagem de imagens
+- otimização automática
+- compressão
+- geração de URLs públicas
+- facilidade de integração com aplicações web
+
+---
+
+## Autenticação
+
+### JWT (JSON Web Token)
+
+**Categoria:** Autenticação
+
+JWT foi utilizado para autenticação de usuários e controle de sessões da aplicação.
+
+A tecnologia permite autenticação stateless, reduzindo a necessidade de armazenamento de sessões no servidor.
+
+---
+
+## Interface e Prototipagem
+
+### Figma
+
+**Categoria:** Design UI/UX
+
+O Figma foi utilizado para criação dos mockups, wireframes e prototipagem inicial da interface do sistema.
+
+---
+
+## Versionamento
+
+### Git e GitHub
+
+**Categoria:** Controle de versão
+
+Utilizados para versionamento do código-fonte, organização do desenvolvimento e hospedagem pública da documentação do projeto.
+
+---
+
+## Resumo da Stack
+
+| Tecnologia | Categoria | Responsabilidade |
+|---|---|---|
+| React | Frontend | Interface do usuário |
+| Node.js | Backend | Execução do servidor |
+| Express.js | Framework Backend | API REST |
+| PostgreSQL | Banco Relacional | Dados estruturados |
+| MongoDB | Banco NoSQL | Estado do editor |
+| Cloudinary | Storage | Imagens e assets |
+| JWT | Autenticação | Controle de sessão |
+| Git/GitHub | Versionamento | Controle de código |
+| Figma | UI/UX | Prototipagem |
 
 ---
 
