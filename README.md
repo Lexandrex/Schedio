@@ -609,7 +609,7 @@ O diagrama de contexto apresenta a visão macro do sistema e suas interações e
 ![imagem exeplo](Screenshots/FluxoAlternado)
 
 ---
-# 5.2 Diagrama de Containers
+## Nível 2 — Diagrama de Containers
 
 O diagrama abaixo apresenta a arquitetura de alto nível do sistema, demonstrando os principais containers responsáveis pela interface, processamento e persistência de dados.
 
@@ -642,7 +642,7 @@ O diagrama abaixo apresenta a arquitetura de alto nível do sistema, demonstrand
 
 ---
 
-# 5.3 Diagrama de Componentes
+# Nível 3 — Diagrama de Componentes
 
 O diagrama abaixo apresenta a organização interna da API backend do sistema.
 
@@ -689,18 +689,160 @@ Inclua **diagramas do modelo de dados**.
 
 ## 5.3 Principais Componentes
 
-Descreva os principais módulos do sistema.
+Esta seção apresenta os principais módulos responsáveis pelo funcionamento do sistema.
 
-Exemplo:
-
-- API
-- sistema de autenticação
-- módulo de processamento
-- camada de persistência
+Os componentes foram organizados de forma modular para facilitar manutenção, escalabilidade e separação de responsabilidades.
 
 ---
 
+## Frontend Web
 
+Responsável pela interface visual da aplicação e interação com os usuários.
+
+### Funcionalidades
+
+- renderização das telas
+- editor visual
+- navegação entre projetos
+- autenticação visual
+- visualização de Projetos
+- gerenciamento de estado da interface
+
+### Tecnologias
+
+- React
+- JavaScript
+- CSS
+
+---
+
+## API Backend
+
+Responsável pelo processamento das requisições e aplicação das regras de negócio.
+
+### Funcionalidades
+
+- gerenciamento de usuários
+- autenticação
+- gerenciamento de projetos
+- controle de permissões
+- comunicação com bancos de dados
+- integração com serviços externos
+
+### Tecnologias
+
+- Node.js
+- Express.js
+
+---
+
+## Sistema de Autenticação
+
+Módulo responsável pela autenticação e autorização de usuários.
+
+### Funcionalidades
+
+- login
+- cadastro
+- recuperação de senha
+- geração de tokens JWT
+- validação de sessão
+- controle de permissões
+
+### Tecnologias
+
+- JWT
+- bcrypt
+
+---
+
+## Módulo do Editor Visual
+
+Responsável pela criação e edição de histórias interativas e protótipos.
+
+### Funcionalidades
+
+- criação de telas
+- conexões entre telas
+- edição de elementos visuais
+- zoom e navegação
+- salvamento automático
+- gerenciamento do estado do editor
+
+### Tecnologias
+
+- React
+- MongoDB
+
+---
+
+## Camada de Persistência
+
+Responsável pelo armazenamento e recuperação de dados da aplicação.
+
+### PostgreSQL
+
+Armazena dados estruturados:
+
+- usuários
+- autenticação
+- curtidas
+- favoritos
+
+### MongoDB
+
+Armazena dados dinâmicos do editor:
+
+- telas
+- conexões
+- elementos gráficos
+- estados do projeto
+
+---
+
+## Módulo de Armazenamento de Imagens
+
+Responsável pelo upload e gerenciamento de imagens utilizadas nos projetos.
+
+### Funcionalidades
+
+- upload de imagens
+- armazenamento em nuvem
+- geração de URLs públicas
+- otimização de imagens
+
+### Tecnologia
+
+- Cloudinary
+
+---
+
+## Sistema de Compartilhamento
+
+Responsável pela publicação e compartilhamento dos projetos.
+
+### Funcionalidades
+
+- geração de links públicos
+- compartilhamento de projetos
+- controle de privacidade
+- visualização pública
+
+---
+
+## Resumo dos Componentes
+
+| Componente | Responsabilidade |
+|---|---|
+| Frontend Web | Interface do usuário |
+| API Backend | Regras de negócio |
+| Sistema de Autenticação | Login e segurança |
+| Editor Visual | Criação de projetos |
+| Camada de Persistência | Armazenamento de dados |
+| Storage de Imagens | Upload e gerenciamento de assets |
+| Sistema de Compartilhamento | Publicação de projetos |
+
+---
 
 # 5.4 Stack Tecnológica
 
