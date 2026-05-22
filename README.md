@@ -74,12 +74,12 @@ Para justificar o impacto do projeto proposto para desenvolvimento, foi realizad
 
 Entre as perguntas presentes no questionário, uma delas foi: “Você costuma utilizar o Figma para outras funções além da criação de protótipos de projetos envolvendo desenvolvimento de software?”. Os resultados indicaram que 85,7% dos participantes responderam “não”, enquanto 14,3% responderam “sim”.
 
-![imagem exeplo](Screenshots/Resultado1)
+![imagem exeplo](Screenshots/Resultado1.png)
 
 Esse resultado pode indicar que uma grande parcela dos usuários utiliza o Figma exclusivamente para sua proposta principal, ou ainda que parte do público considera a ferramenta complexa de utilizar, o que pode limitar sua aplicação em outros contextos.
 
 Esse cenário também se relaciona com outro questionamento presente na enquete: “Você utilizaria uma nova versão mais simplificada do Figma e totalmente gratuita?”. O resultado obtido foi expressivo, com 100% dos participantes respondendo “sim”.
-![imagem exeplo](Screenshots/Resultado2)
+![imagem exeplo](Screenshots/Resultado2.png)
 
 Esse resultado pode estar relacionado a mudanças recentes em algumas funcionalidades do Figma, especialmente no setor de prototipagem, que passaram a fazer parte de planos pagos. Essa alteração pode ter dificultado o processo de desenvolvimento para diversos usuários, principalmente aqueles que utilizam a ferramenta para projetos pessoais ou acadêmicos.
 
@@ -110,7 +110,7 @@ Limitações:
 - Baixa flexibilidade para projetos mais complexos
 - Falta de recursos voltados para prototipagem ou design de interfaces
 
-![imagem exeplo](Screenshots/Netstory)
+![imagem exeplo](Screenshots/Netstory.png)
 
 ### 2. Squiffy
 
@@ -132,7 +132,7 @@ Limitações:
 - Pouco suporte a elementos visuais e multimídia
 - Não possui recursos colaborativos em tempo real---
 
-  ![imagem exeplo](Screenshots/Squiffy)
+  ![imagem exeplo](Screenshots/Squiffy.png)
 
 ### 3. Figma
 
@@ -154,7 +154,7 @@ Limitações:
 - Algumas funcionalidades importantes são pagas
 - Curva de aprendizado relativamente elevada para iniciantes
 
-  ![imagem exeplo](Screenshots/figma)
+  ![imagem exeplo](Screenshots/figma.png)
 
 ### Comparação
 | Solução   | Pontos Fortes                            | Limitações                                  |
@@ -302,7 +302,7 @@ Liste os principais fluxos do sistema.
 - Publicar
 - definir categoria (privada/publica)
 - 
-![imagem exeplo](Screenshots/casodeuso)
+![imagem exeplo](Screenshots/casodeuso.png)
 
 ---
 
@@ -489,96 +489,396 @@ O foco inicial será:
 
 ## 3.1 Fluxo Principal do Usuário
 
-![imagem exeplo](Screenshots/Fluxoprincipal)
+![imagem exeplo](Screenshots/Fluxoprincipal.png)
 
 ---
-![imagem exeplo](Screenshots/FluxoprincipalEditor)
+![imagem exeplo](Screenshots/FluxoprincipalEditor.png)
 ---
 
 ## 3.2 Fluxos Alternativos
-![imagem exeplo](Screenshots/FluxoAlternado)
+![imagem exeplo](Screenshots/FluxoAlternado.png)
 ---
 
 # 4. Mockups e Experiência do Usuário (UX)
 
 Esta seção apresenta **a visualização inicial do produto antes da implementação**.
 
-Mockups ajudam a validar:
+---
 
-- fluxo de navegação
-- organização da interface
-- interações do usuário
-- clareza da experiência
-
-Ferramentas sugeridas:
-
-- Figma
-- Excalidraw
-- Balsamiq
-- Whimsical
-- protótipos desenhados à mão
+## 1 fluxo principal
+Esta seção descreve o funcionamento das telas relacionadas à autenticação e gerenciamento de acesso dos usuários.
 
 ---
 
-## 4.1 Fluxo de Navegação
+## Login
 
-Apresente um diagrama mostrando como o usuário navega entre telas.
+A tela de login será a primeira interface visualizada pelo usuário ao acessar o sistema.
 
-Exemplo:
+Nela, o usuário poderá inserir suas credenciais para autenticação e acesso às funcionalidades disponíveis da plataforma.
 
-Login → Dashboard → Cadastro → Relatório
+### Funcionalidades
 
-Inclua **imagem do fluxo de navegação**.
+- autenticação de usuários
+- redirecionamento para cadastro
+- acesso à recuperação de senha
 
----
+### Ações disponíveis
 
-## 4.2 Wireframes ou Mockups das Telas
-
-Apresente os principais mockups do sistema.
-
-Inclua pelo menos:
-
-- tela inicial
-- fluxo principal
-- tela de entrada de dados
-- tela de resultado ou visualização
-
-Para cada tela inclua:
-
-- imagem
-- breve descrição da funcionalidade
-- ações principais do usuário
-
-Sempre que possível:
-
-- inclua **links para protótipo navegável**
-- inclua **prints das telas**
+- entrar
+- criar conta
+- recuperar senha
 
 ---
 
-## 4.3 Fluxo de Interação do Usuário
+## Registrar-se
 
-Demonstre passo a passo um fluxo importante.
+Esta etapa será destinada a novos usuários que ainda não possuem uma conta na plataforma.
 
-Exemplo:
+Ao selecionar a opção **"Criar conta"** na tela de login, o usuário será redirecionado para a tela de registro.
 
-1. usuário acessa o sistema  
-2. cria conta  
-3. registra dados  
-4. visualiza resultados  
+Nessa tela serão solicitadas as credenciais necessárias para criação da conta, permitindo posteriormente o acesso ao sistema através da tela de login.
 
-Inclua **sequência de telas ou fluxo visual**.
+### Funcionalidades
+
+- criação de conta
+- validação de dados
+- cadastro de credenciais
 
 ---
 
-## 4.4 Feedback Inicial de Usuários (Opcional)
+## Recuperação de Senha
 
-Se possível, inclua:
+A recuperação de senha será um fluxo alternativo destinado a usuários que esqueceram suas credenciais de acesso.
 
-- comentários de usuários
-- sugestões de melhoria
-- validação inicial do mockup
+Após uma tentativa de login ou através da opção **"Esqueci minha senha"**, o usuário será redirecionado para a tela de recuperação.
 
+O sistema solicitará o código de autenticação enviado ao e-mail associado à conta.
+
+Após a validação correta do código, o usuário será direcionado para a redefinição de senha.
+
+Para redefinir sua senha o usuário deverá informar a nova senha e comfirma-la novamente.
+
+### Funcionalidades
+
+- envio de código de autenticação
+- validação do código
+- redefinição de senha
+
+### Fluxo
+
+Login → Esqueci minha senha → Código por e-mail → Redefinir senha → Login
+
+---
+![Tela de Login](Screenshots/login.png)
+---
+
+## 2 Fluxo de usuário
+
+Esta seção descreve as principais telas disponíveis para navegação e interação do usuário dentro da plataforma.
+
+---
+
+## Tela Inicial
+
+A tela inicial será o primeiro contato visual do usuário com a plataforma, funcionando como a principal porta de entrada do sistema.
+
+Nela, o usuário poderá acessar a área de edição de projetos, realizar login em sua conta e visualizar obras publicadas por outros editores da comunidade.
+
+Assim como poderá acessar seu propio perfil tendo acesso a mais opções de usuário.
+
+A interface foi planejada para facilitar a descoberta de novos conteúdos e tornar o acesso às principais funcionalidades mais intuitivo.
+
+### Funcionalidades
+
+- acessar a área de edição de projetos
+- visualizar obras publicadas
+- explorar projetos da comunidade
+- pesquisar projetos
+- acessar perfil pessoal
+
+### Objetivos da Tela
+
+- apresentar a proposta da plataforma
+- facilitar acesso ao editor
+- incentivar exploração de conteúdos
+- destacar projetos da comunidade
+- centralizar navegação principal do sistema
+
+## Tela de Usuário
+
+A tela de usuário funcionará como o perfil principal da conta, permitindo personalização das informações públicas e gerenciamento das configurações pessoais da plataforma.
+
+Nessa área, o usuário poderá configurar quais informações outros usuários poderão visualizar ao acessar seu perfil, além de personalizar elementos da conta e acompanhar informações relacionadas às suas atividades dentro da plataforma.
+
+Também será possível visualizar projetos já desenvolvidos, quantidade de likes recebidos e acessar a área de segurança da conta.
+
+### Funcionalidades
+
+- alterar nome de usuário
+- alterar foto de perfil
+- adicionar ou editar biografia
+- adicionar informações pessoais públicas
+- visualizar quantidade de likes recebidos
+- visualizar projetos publicados
+- acessar configurações da conta
+- alterar senha
+- alterar tema/cor de fundo
+- excluir conta
+
+### Objetivos da Tela
+
+- centralizar informações do usuário
+- permitir personalização do perfil
+- facilitar gerenciamento da conta
+- exibir atividade pública do usuário
+- melhorar interação social da plataforma
+
+---
+![Perfil do Usuário](Screenshots/perfil.png)
+---
+
+## 3 Fluxo de leitor
+
+Esta seção descreve o funcionamento das principais telas disponíveis para leitores dentro da plataforma.
+
+O fluxo foi planejado para facilitar a descoberta de conteúdos, incentivar a interação com obras publicadas e proporcionar uma experiência intuitiva durante a leitura de histórias interativas, artigos e outros projetos criados pela comunidade.
+
+---
+
+## Tela Inicial
+
+Nessa tela, o leitor poderá visualizar obras publicadas por diversos escritores, organizadas por categorias.
+
+Os conteúdos disponíveis poderão variar entre:
+
+- histórias de aventura
+- artigos
+- teses científicas
+- protótipos de aplicações UI/UX
+- projetos interativos
+
+Através da barra de pesquisa, também será possível procurar tanto pelo nome das obras quanto pelos nomes de seus respectivos criadores.
+
+A tela inicial funcionará como principal área de descoberta de conteúdos da plataforma.
+
+### Funcionalidades
+
+- visualizar obras publicadas
+- navegar por categorias
+- pesquisar obras
+- pesquisar escritores
+- acessar histórias salvas
+- acessar perfil do usuário
+
+### Objetivos da Tela
+
+- facilitar descoberta de conteúdos
+- organizar projetos por categorias
+- incentivar interação entre leitores e criadores
+- simplificar acesso às obras publicadas
+
+---
+
+## Primeira Visualização do Projeto
+
+Nesta etapa, o leitor poderá visualizar informações mais detalhadas sobre o projeto selecionado.
+
+A tela apresentará uma pequena sinopse ou explicação fornecida pelo criador da obra, além de informações como:
+
+- nome do projeto
+- nome do criador
+- data de publicação
+
+### Funcionalidades
+
+- visualizar sinopse da obra
+- visualizar informações do criador
+- visualizar capa do projeto
+- curtir projeto
+- salvar para ler mais tarde
+- denunciar conteúdo
+- iniciar leitura
+
+### Objetivos da Tela
+
+- apresentar informações detalhadas do projeto
+- incentivar interação social
+- facilitar decisão de leitura
+- permitir avaliação inicial da obra
+
+---
+
+## Tela de Visualização
+
+Após clicar em **"Ler"** na tela anterior, o usuário será direcionado para a área principal de visualização do projeto.
+
+Nessa tela será possível visualizar o conteúdo desenvolvido pelo editor e navegar entre as diferentes telas da obra.
+
+A navegação poderá ocorrer através:
+
+- das setas disponíveis na interface
+- de interações adicionadas pelo criador
+- de escolhas feitas durante a leitura
+
+O usuário também poderá retornar para a tela anterior a qualquer momento.
+
+### Funcionalidades
+
+- visualizar conteúdo da obra
+- avançar entre telas
+- retornar etapas anteriores
+- interagir com elementos da história
+- realizar escolhas interativas
+- navegar por conexões criadas pelo autor
+
+### Objetivos da Tela
+
+- proporcionar leitura interativa
+- permitir navegação dinâmica
+- aumentar imersão do leitor
+- facilitar interação com o conteúdo
+
+---
+
+## Fluxo Alternativo
+
+Na tela principal, caso o usuário tenha salvo uma história para leitura posterior, a plataforma passará a priorizar essas obras.
+
+Nesse cenário, os projetos salvos aparecerão na parte superior da interface inicial, enquanto os demais projetos publicados pela comunidade permanecerão logo abaixo.
+
+Esse comportamento tem como objetivo facilitar a retomada de leituras já iniciadas ou marcadas pelo usuário.
+
+### Funcionalidades
+
+- priorizar histórias salvas
+- facilitar retomada de leitura
+- reorganizar conteúdos da tela inicial
+
+### Objetivos do Fluxo Alternativo
+
+- melhorar experiência do usuário
+- facilitar continuidade da leitura
+- destacar conteúdos favoritos do leitor
+
+---
+![Fluxo do Leitor](Screenshots/leitor.png)
+---
+
+
+## Fluxo do Editor
+
+Esta seção descreve o funcionamento das principais telas disponíveis para usuários criadores dentro da plataforma.
+
+O fluxo foi planejado para permitir gerenciamento de projetos, criação de histórias interativas e desenvolvimento de protótipos de forma simples, intuitiva e visual.
+
+---
+
+## Visualização de Projetos
+
+Nesta tela ficarão disponíveis todos os projetos criados pelo editor, incluindo:
+
+- projetos finalizados
+- projetos em andamento
+- projetos publicados
+- projetos privados
+
+O usuário poderá visualizar, pesquisar e gerenciar facilmente todas as suas obras através de uma interface organizada.
+
+Também será possível criar novos projetos ou remover projetos já existentes.
+
+### Funcionalidades
+
+- visualizar projetos criados
+- pesquisar projetos
+- criar novo projeto
+- excluir projeto
+- visualizar projetos publicados
+- visualizar projetos privados
+- acessar editor de projetos
+
+### Objetivos da Tela
+
+- centralizar gerenciamento dos projetos
+- facilitar acesso às obras criadas
+- simplificar organização dos projetos
+- agilizar criação de novos conteúdos
+
+---
+
+## Editor de Projeto
+
+O editor de projetos será o principal componente da plataforma, funcionando de maneira semelhante ao Figma, porém adaptado para criação de histórias interativas, fluxos narrativos e protótipos visuais.
+
+Nessa área, o criador terá acesso às ferramentas necessárias para construção e edição de seus projetos, assim como criar links de compartilhamento para ter ajuda de outros editores com certas permissões.
+
+Será possível adicionar:
+
+- imagens
+- textos
+- formas
+- conexões
+- interações
+- fluxos entre telas
+
+O editor também permitirá criação de histórias com múltiplos caminhos, onde o rumo da narrativa poderá mudar dependendo das interações realizadas pelo leitor.
+
+### Funcionalidades
+
+- adicionar imagens
+- adicionar textos
+- adicionar formas
+- editar elementos visuais
+- alterar cores
+- alterar tamanhos
+- movimentar objetos
+- gerenciar links
+- criar conexões entre telas
+- definir interações
+- criar caminhos alternativos
+- visualizar fluxo do projeto
+- salvar projeto
+- salvamento automático
+
+### Objetivos da Tela
+
+- permitir criação visual de projetos
+- facilitar desenvolvimento de histórias interativas
+- simplificar criação de fluxos narrativos
+- proporcionar edição intuitiva
+- permitir prototipagem visual
+
+---
+
+## Perfil de Criador
+
+Esta será a tela pública de visualização do perfil do criador.
+
+Semelhante ao perfil de usuário, essa área será destinada à exibição das informações públicas do editor e de suas obras publicadas.
+
+Os leitores poderão visualizar:
+
+- nome do criador
+- biografia
+- projetos publicados
+- continuidade de histórias e projetos
+
+### Funcionalidades
+
+- visualizar perfil público
+- visualizar biografia do criador
+- visualizar obras publicadas
+- acompanhar continuidade de projetos
+- acessar projetos publicados
+
+### Objetivos da Tela
+
+- destacar criadores da plataforma
+- facilitar descoberta de obras
+- incentivar interação entre leitores e criadores
+- centralizar projetos publicados do editor
+
+---
+![Editor de Projeto](Screenshots/editor.png)
 ---
 
 # 5. Arquitetura do Sistema
@@ -606,7 +906,7 @@ O diagrama de contexto apresenta a visão macro do sistema e suas interações e
 
 ---
 
-![imagem exeplo](Screenshots/FluxoAlternado)
+![Diagrama de Contexto](Screenshots/nivel1.png)
 
 ---
 ## Nível 2 — Diagrama de Containers
@@ -638,7 +938,7 @@ O diagrama abaixo apresenta a arquitetura de alto nível do sistema, demonstrand
 
 ---
 
-![Container Diagram](docs/c4/container-diagram.png)
+![Diagrama de Containers](Screenshots/nivel2.png)
 
 ---
 
@@ -671,7 +971,7 @@ Controller → Service → Repository → Banco de Dados
 
 ---
 
-iamgem
+![Diagrama de Componentes](Screenshots/nivel3.png)
 
 ---
 
