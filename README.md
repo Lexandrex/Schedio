@@ -977,15 +977,117 @@ Controller → Service → Repository → Banco de Dados
 
 ## 5.2 Modelo de Dados
 
-Apresente:
+Esta seção apresenta a estrutura de persistência utilizada pelo sistema, incluindo os modelos relacionais e não relacionais responsáveis pelo armazenamento das informações da plataforma.
 
-- DER (diagrama entidade relacionamento)
-- esquema relacional
-- modelo de documentos (NoSQL)
-
-Inclua **diagramas do modelo de dados**.
+O sistema utiliza uma arquitetura híbrida de dados, combinando bancos relacionais e NoSQL para atender diferentes necessidades da aplicação.
 
 ---
+
+# Modelo Relacional (PostgreSQL)
+
+O PostgreSQL será responsável pelo armazenamento de dados estruturados da plataforma.
+
+Entre os principais dados persistidos estão:
+
+- usuários
+- autenticação
+- curtidas
+- favoritos
+- permissões
+- metadados dos projetos
+
+---
+
+## Principais Entidades
+
+| Entidade | Responsabilidade |
+|---|---|
+| usuarios | armazenamento de usuários |
+| projetos | informações gerais dos projetos |
+| imagens  | armazenamento de imagens |
+
+---
+
+## Relacionamentos
+
+- um usuário pode possuir vários projetos
+- um usuário pode curtir vários projetos
+- um usuário pode salvar vários projetos
+- um usuário pode denunciar projetos
+- um projeto pode possuir varias imagens
+
+---
+![Tabelas relacionais](Screenshots/tabela.png)
+---
+# Modelo NoSQL (MongoDB)
+
+O MongoDB será responsável pelo armazenamento do estado dinâmico do editor visual e da estrutura dos projetos interativos.
+
+A escolha do MongoDB ocorreu devido à flexibilidade no armazenamento de estruturas complexas e variáveis.
+
+---
+
+## Estruturas Armazenadas
+
+- telas
+- conexões
+- elementos visuais
+- posições
+- interações
+- estados do editor
+
+---
+
+## Modelo de Documento
+
+```json
+{
+  "projectId": "123",
+  "screens": [
+    {
+      "id": "screen-01",
+      "title": "Introdução",
+      "elements": [
+        {
+          "type": "text",
+          "content": "Bem-vindo à história"
+        },
+        {
+          "type": "image",
+          "url": "image.png"
+        }
+      ],
+      "connections": [
+        {
+          "target": "screen-02",
+          "action": "button-click"
+        }
+      ]
+    }
+  ]
+}
+```
+---
+
+# Armazenamento de Imagens
+
+As imagens utilizadas nos projetos serão armazenadas utilizando Cloudinary.
+
+O sistema armazenará apenas:
+
+- URLs públicas
+- identificadores das imagens
+- metadados necessários
+
+---
+
+# Objetivos do Modelo de Dados
+
+- organizar persistência da aplicação
+- separar dados relacionais e dinâmicos
+- facilitar escalabilidade futura
+- melhorar organização arquitetural
+- simplificar manutenção do sistema
 
 ## 5.3 Principais Componentes
 
