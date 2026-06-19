@@ -193,7 +193,7 @@ Desenvolver uma plataforma digital que permita a criação, organização e publ
 - Permitir colaboração em tempo real entre múltiplos usuários
 - Criar um sistema de navegação interativa para os leitores
 - Disponibilizar uma interface simples e acessível para usuários iniciantes
-- Permitir a privatização de Prototipazem 
+- Permitir a privatização de Prototipagem e Projetos 
 
 ---
 
@@ -213,7 +213,7 @@ Desenvolver uma plataforma digital que permita a criação, organização e publ
 
 ###  Ana — Escritora
 
-- **Contexto:** Ana é uma estudante de lestras que gosta de escrever histórias interativas e artigos
+- **Contexto:** Ana é uma estudante de letras que gosta de escrever histórias interativas e artigos
 - **Objetivos:**
   - Criar histórias com múltiplos caminhos
   - Publicar conteúdo  
@@ -241,7 +241,7 @@ Desenvolver uma plataforma digital que permita a criação, organização e publ
 - **Contexto:** Consumidor de histórias criadas pelos amigos 
 - **Objetivos:**
   - Explorar histórias interativas
-  - Incentivar a criação de novos conteudos 
+  - Incentivar a criação de novos conteúdos 
 - **Dificuldades:**
   - Poucas plataformas  
   - Conteúdo desorganizado
@@ -536,7 +536,7 @@ O sistema solicitará o código de autenticação enviado ao e-mail associado à
 
 Após a validação correta do código, o usuário será direcionado para a redefinição de senha.
 
-Para redefinir sua senha o usuário deverá informar a nova senha e comfirma-la novamente.
+Para redefinir sua senha, o usuário deverá informar a nova senha e confirmá-la novamente.
 
 ### Funcionalidades
 
@@ -564,7 +564,7 @@ A tela inicial será o primeiro contato visual do usuário com a plataforma, fun
 
 Nela, o usuário poderá acessar a área de edição de projetos, realizar login em sua conta e visualizar obras publicadas por outros editores da comunidade.
 
-Assim como poderá acessar seu propio perfil tendo acesso a mais opções de usuário.
+Além disso, poderá acessar seu próprio perfil e as demais funcionalidades da conta.
 
 A interface foi planejada para facilitar a descoberta de novos conteúdos e tornar o acesso às principais funcionalidades mais intuitivo.
 
