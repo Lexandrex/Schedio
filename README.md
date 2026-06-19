@@ -31,21 +31,6 @@ O desenvolvimento da aplicação Web (Schedio Drasis) tem como objetivo providen
 
 ## 1.1 Contexto e Problema
 
-Descreva claramente o problema que motivou o projeto.
-
-Explique:
-
-- Quem sofre com esse problema
-- Em que contexto ele ocorre
-- Como esse problema é resolvido atualmente
-- Quais são as limitações das soluções atuais
-
-Sempre que possível apresente:
-
-- exemplos reais
-- prints de processos atuais
-- descrições de fluxos existentes
-
 Atualmente, não se encontram facilmente aplicativos ou plataformas que proporcionem ao escritor plena liberdade sobre sua obra, permitindo também disponibilizá-la ao público de forma interativa. Um gênero conhecido como “interactive fiction” consiste justamente na possibilidade de o público interagir em tempo real com o conteúdo apresentado na tela, podendo alterar o rumo da história.
 
 Além disso, em contextos informativos, como artigos, o leitor poderia especificar ou aprofundar determinadas informações por meio de imagens adicionais ou ser redirecionado para tópicos mais específicos relacionados ao conteúdo apresentado.
@@ -61,12 +46,6 @@ O objetivo desta proposta não é substituir nenhuma dessas tecnologias. Pelo co
 ---
 
 ## 1.2 Origem da Demanda e Evidências
-
-É necessário demonstrar que existe **interesse real pela solução**.
-
-Apresente pelo menos **uma evidência concreta**.
-
----
 
 ### Pesquisa com Usuários
 
@@ -192,6 +171,7 @@ A plataforma poderá ser utilizada em diferentes contextos, como:
 
 - criação de histórias interativas
 - desenvolvimento de protótipos narrativos para jogos
+- desenvolvimento de protótipos de interface UI/UX
 - organização de ideias e fluxos de informação
 - produção de conteúdo educacional ou informativo com navegação interativa
 
@@ -1385,64 +1365,385 @@ Utilizados para versionamento do código-fonte, organização do desenvolvimento
 
 # 6. Segurança e Privacidade
 
-Inclua preocupações básicas de segurança.
+Esta seção apresenta as medidas de segurança adotadas pelo sistema para proteção dos dados dos usuários e garantia da integridade da plataforma.
 
-Exemplos:
-
-- proteção contra OWASP Top 10
-- autenticação e autorização
-- criptografia de dados sensíveis
+O projeto foi desenvolvido seguindo boas práticas de desenvolvimento seguro, com foco na proteção das informações armazenadas e na privacidade dos usuários.
 
 ---
 
-## 6.1 Privacidade e LGPD
+## Medidas de Segurança
 
-Explique:
+### Autenticação e Autorização
 
-- quais dados serão coletados
-- como serão armazenados
-- como o usuário poderá solicitar remoção de dados
+O sistema utilizará autenticação baseada em login e senha para identificação dos usuários.
 
+Após a autenticação, serão gerados tokens de acesso que permitirão a utilização das funcionalidades da plataforma de forma segura.
+
+#### Implementações
+
+- autenticação por e-mail e senha
+- utilização de tokens JWT
+- validação de permissões de acesso
+- controle de sessões autenticadas
+
+---
+
+### Criptografia de Dados Sensíveis
+
+Dados sensíveis armazenados pelo sistema receberão tratamento adequado para evitar acessos não autorizados.
+
+#### Implementações
+
+- criptografia de senhas utilizando algoritmos seguros
+- proteção de informações sensíveis durante a autenticação
+- armazenamento seguro de credenciais
+
+---
+
+### Proteção Contra Vulnerabilidades Comuns
+
+O sistema adotará práticas básicas de desenvolvimento seguro visando reduzir riscos de exploração.
+
+#### Implementações
+
+- validação de entradas do usuário
+- proteção contra SQL Injection
+- proteção contra Cross-Site Scripting (XSS)
+- proteção contra acesso não autorizado a recursos privados
+- validação de permissões em operações críticas
+
+### Segurança da API
+
+A API do sistema seguirá boas práticas de desenvolvimento seguro para evitar vulnerabilidades comuns relacionadas ao processamento de dados enviados pelos usuários.
+
+#### Implementações
+
+- utilização de consultas parametrizadas
+- validação de todos os dados recebidos pela API
+- sanitização de entradas do usuário
+- limitação de tamanho de campos enviados
+- validação de tipos de dados
+- utilização de ORM para abstração de consultas ao banco de dados
+- controle de permissões por rota
+
+#### Proteção Contra SQL Injection
+
+O sistema não realizará concatenação direta de valores enviados pelo usuário em consultas SQL.
+
+Exemplo inseguro:
+
+```sql
+SELECT * FROM users WHERE email = '${email}'
+```
+
+Exemplo seguro:
+
+```sql
+SELECT * FROM users WHERE email = $1
+```
+
+ou utilizando ORM:
+
+```javascript
+const user = await User.findOne({
+  where: { email }
+});
+```
+Dessa forma, os dados enviados pelo usuário são tratados separadamente da consulta SQL, impedindo tentativas de manipulação maliciosa.
+
+#### Proteção Contra Entradas Maliciosas
+
+Todos os dados recebidos pela API passarão por validação antes de serem processados.
+
+Exemplos:
+
+- validação de e-mails
+- validação de senhas
+- validação de UUIDs
+- validação de tamanho de textos
+- bloqueio de caracteres inválidos quando necessário
+
+#### Objetivos
+
+- prevenir SQL Injection
+- reduzir riscos de execução de comandos indevidos
+- garantir integridade dos dados
+- aumentar a confiabilidade da API
+
+---
+
+## Conformidade com a LGPD
+
+O sistema seguirá os princípios da Lei Geral de Proteção de Dados (LGPD), coletando apenas as informações necessárias para funcionamento da plataforma.
+
+---
+
+## Dados Coletados
+
+Serão coletados apenas os dados essenciais para utilização do sistema.
+
+### Dados de Cadastro
+
+- nome de usuário
+- e-mail
+- senha
+
+### Dados de Perfil
+
+- foto de perfil (opcional)
+- biografia (opcional)
+- preferências de personalização
+
+### Dados de Utilização
+
+- projetos criados
+- projetos curtidos
+- projetos salvos
+- histórico básico de utilização da plataforma
+
+---
+
+## Armazenamento dos Dados
+
+Os dados serão armazenados em bancos de dados protegidos e utilizados exclusivamente para funcionamento da plataforma.
+
+As senhas não serão armazenadas em formato legível, sendo protegidas por mecanismos de criptografia adequados.
+
+---
+
+## Direitos do Usuário
+
+O usuário terá controle sobre suas informações dentro da plataforma.
+
+### Funcionalidades Disponíveis
+
+- editar informações do perfil
+- alterar nome de usuário
+- alterar foto de perfil
+- alterar senha
+- remover conteúdos publicados
+- excluir permanentemente sua conta
+
+---
+
+## Remoção de Dados
+
+A qualquer momento o usuário poderá solicitar a exclusão de sua conta através das configurações do perfil.
+
+Após a exclusão:
+
+- os dados da conta serão removidos do sistema
+- as credenciais de acesso deixarão de existir
+- os conteúdos associados poderão ser removidos ou anonimizados conforme as regras da plataforma
+
+---
+
+## Objetivos de Segurança
+
+- proteger informações dos usuários
+- garantir autenticação segura
+- reduzir riscos de acesso não autorizado
+- cumprir princípios básicos da LGPD
+- oferecer transparência sobre utilização dos dados
 ---
 
 # 7. Planejamento do Projeto
 
-Defina os principais marcos de desenvolvimento.
+Esta seção apresenta os principais marcos previstos para o desenvolvimento do sistema.
+
+O planejamento foi estruturado de forma incremental, permitindo validação contínua das funcionalidades e evolução gradual do projeto.
 
 | Marco | Descrição | Prazo |
-|---|---|---|
-| M1 | Setup do ambiente e prova de conceito | Semana X |
-| M2 | MVP funcional | Semana Y |
-| M3 | Testes e melhorias | Semana Z |
+|---------|---------|---------|
+| M1 | Levantamento de requisitos, pesquisa de mercado e definição do escopo | Semana 1 |
+| M2 | Criação da documentação inicial, personas e regras de negócio | Semana 2 |
+| M3 | Desenvolvimento dos mockups, wireframes e fluxos de usuário | Semana 3 |
+| M4 | Definição da arquitetura do sistema e modelagem do banco de dados | Semana 4 |
+| M5 | Configuração do ambiente de desenvolvimento e criação da estrutura base do projeto | Semana 5 |
+| M6 | Implementação do sistema de autenticação (login, cadastro e recuperação de senha) | Semana 6 |
+| M7 | Implementação do gerenciamento de usuários e perfis | Semana 7 |
+| M8 | Desenvolvimento do editor visual de projetos (MVP) | Semana 8 |
+| M9 | Implementação do sistema de projetos e publicação | Semana 9 |
+| M10 | Implementação da visualização de projetos para leitores | Semana 10 |
+| M11 | Implementação de likes, favoritos e histórico de leitura | Semana 11 |
+| M12 | Integração com armazenamento de imagens (Cloudinary) | Semana 12 |
+| M13 | Testes funcionais e correção de bugs | Semana 13 |
+| M14 | Melhorias de interface, usabilidade e desempenho | Semana 14 |
+| M15 | Documentação final e preparação para apresentação | Semana 15 |
 
 ---
 
-# 8. Referências
+## Principais Entregas
 
-Inclua:
+### Entrega 1 — Planejamento
 
-- artigos
-- documentação técnica
-- ferramentas utilizadas
-- repositórios
+- levantamento de requisitos
+- benchmark
+- personas
+- regras de negócio
+- documentação inicial
+
+### Entrega 2 — Protótipo
+
+- wireframes
+- mockups
+- fluxo de navegação
+- validação da experiência do usuário
+
+### Entrega 3 — MVP Funcional
+
+- autenticação
+- gerenciamento de usuários
+- criação de projetos
+- editor visual básico
+
+### Entrega 4 — Plataforma Completa
+
+- publicação de projetos
+- visualização para leitores
+- sistema de likes
+- salvamento de projetos
+
+### Entrega 5 — Finalização
+
+- testes
+- correções
+- documentação final
+- apresentação do projeto
 
 ---
 
-# 9. Apêndices
+## Objetivo Final
 
-Podem incluir:
-
-- mockups adicionais
-- resultados de pesquisa
-- entrevistas com usuários
-- diagramas complementares
-- links para protótipos ou repositórios
-
-Sempre que possível inclua **imagens, protótipos ou referências visuais**.
+Ao final do desenvolvimento, a plataforma deverá permitir que escritores e criadores desenvolvam projetos interativos de forma visual, publiquem suas obras e disponibilizem experiências interativas para os leitores através de um ambiente simples e intuitivo.
 
 ---
 
-# 10. Parecer do Comitê de Avaliação
+## 8. Referências
+
+Esta seção reúne as principais referências utilizadas durante a concepção, modelagem e desenvolvimento do projeto.
+
+---
+
+## Ferramentas de Design e Prototipagem
+
+### Figma
+
+Disponível em: https://www.figma.com
+
+Utilizado como principal referência para estudo de interfaces colaborativas e ferramentas de prototipagem visual.
+
+### Squiffy
+
+Disponível em: https://squiffystory.com
+
+Utilizado como referência para criação de histórias interativas baseadas em escolhas do usuário.
+
+### Netstory
+
+Disponível em: https://netstory.io
+
+Utilizado como referência para sistemas de narrativa interativa e publicação de histórias.
+
+---
+
+## Plataformas de Publicação e Leitura
+
+### Livraria Pública
+
+Disponível em: https://livrariapublica.com.br
+
+Utilizada como referência para organização e disponibilização de conteúdos literários.
+
+### MangaDex
+
+Disponível em: https://mangadex.org
+
+Utilizada como referência para navegação, categorização e leitura de conteúdos publicados pela comunidade.
+
+### Fliptru
+
+Disponível em: https://fliptru.com.br/mkt/about
+
+Utilizada como referência para publicação de histórias digitais e interação entre autores e leitores.
+
+---
+
+## Segurança da Informação
+
+### PortSwigger Web Security Academy
+
+Disponível em: https://portswigger.net/web-security/sql-injection
+
+Utilizada para estudo de vulnerabilidades SQL Injection e práticas de desenvolvimento seguro.
+
+---
+
+## Banco de Dados
+
+### MySQL
+
+Disponível em: https://www.mysql.com
+
+Utilizado como referência para modelagem relacional e conceitos de persistência de dados.
+
+---
+
+## Ferramentas de Desenvolvimento
+
+### Visual Studio Code
+
+Disponível em: https://code.visualstudio.com
+
+Ambiente de desenvolvimento utilizado para implementação do projeto.
+
+### GitHub Copilot
+
+Disponível em: https://github.com/features/copilot
+
+Ferramenta de inteligência artificial utilizada como apoio à programação durante o desenvolvimento do projeto.
+
+### DataGrip
+
+Disponível em: https://www.jetbrains.com/help/datagrip/getting-started.html
+
+Utilizado como referência para gerenciamento e manipulação de bancos de dados.
+
+---
+## Ferramentas de Apoio ao Desenvolvimento
+
+### ChatGPT (OpenAI)
+
+Disponível em: https://chatgpt.com
+
+Utilizado como ferramenta de apoio durante o desenvolvimento do projeto, auxiliando na elaboração da documentação, levantamento de requisitos, definição da arquitetura do sistema, modelagem de banco de dados, organização de fluxos de usuário, revisão textual e esclarecimento de conceitos técnicos relacionados ao desenvolvimento web.
+
+### GitHub Copilot
+
+Disponível em: https://github.com/features/copilot
+
+Utilizado como assistente de programação integrado ao Visual Studio Code, auxiliando na geração de código, sugestões de implementação, correção de erros e aumento da produtividade durante o desenvolvimento do sistema.
+
+---
+
+## Estudos e Documentação Técnica
+
+* Documentação oficial do Figma.
+* Documentação oficial do MongoDB.
+* Documentação oficial do PostgreSQL.
+* Documentação oficial do Node.js.
+* Documentação oficial do Cloudinary.
+* Documentação oficial do React.
+* Materiais relacionados à experiência do usuário (UX/UI).
+* Materiais sobre UX/UI Design.
+* Materiais sobre desenvolvimento de aplicações web colaborativas.
+* Materiais relacionados à Lei Geral de Proteção de Dados (LGPD).
+* Materiais relacionados ao OWASP Top 10.
+* Materiais já desenvolvidos anteriormente pelo acadêmico.
+
+---
+
+# 9. Parecer do Comitê de Avaliação
 
 (A ser preenchido pelos professores)
 
