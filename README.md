@@ -25,7 +25,7 @@ Schedio Drasis
 
 # 1. Visão do Produto e Impacto (O Problema)
 
-O desenvolvimento da aplicação Web (Schedio Drasis) tem como objetivo providenciar uma área onde escritores possam publicar suas histórias ou artigos, de acordo com sua preferência, sendo esses disponíveis ao público ou mantido de maneira privada, neste caso servindo também para desenvolvedores que buscam elaborar protótipos de seus projetos 
+O desenvolvimento da aplicação Web (Schedio Drasis) tem como objetivo providenciar uma área onde escritores possam publicar suas histórias ou artigos, de acordo com sua preferência, sendo esses disponíveis ao público ou mantido de maneira privada, neste caso servindo também para desenvolvedores que buscam elaborar protótipos de seus projetos. 
 
 ---
 
