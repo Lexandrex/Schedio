@@ -1747,8 +1747,9 @@ Utilizado como assistente de programação integrado ao Visual Studio Code, auxi
 
 (A ser preenchido pelos professores)
 
-**Avaliador 1:** __________________________  
-**Status:** [ ] Aprovado  [ ] Ajustar
+**Avaliador 1:** Manfred Heil Junior
+![Assinatura](Screenshots/ass_manfred.png)
+**Status:** [X] Aprovado  [ ] Ajustar
 
 Observações:
 
