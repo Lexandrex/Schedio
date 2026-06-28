@@ -51,13 +51,18 @@ O objetivo desta proposta não é substituir nenhuma dessas tecnologias. Pelo co
 
 Para justificar o impacto do projeto proposto para desenvolvimento, foi realizada uma enquete com diversas perguntas disponibilizadas ao público, com o objetivo de coletar feedback e sugestões dos participantes.
 
-Entre as perguntas presentes no questionário, uma delas foi: “Você costuma utilizar o Figma para outras funções além da criação de protótipos de projetos envolvendo desenvolvimento de software?”. Os resultados indicaram que 85,7% dos participantes responderam “não”, enquanto 14,3% responderam “sim”.
+Entre as perguntas presentes no questionário, uma delas foi: “Você costuma utilizar o Figma para outras funções além da criação de protótipos de projetos envolvendo desenvolvimento de software?”. Os resultados, conforme pode ser visualizado na figura 1, indicaram que 85,7% dos participantes responderam “não”, enquanto 14,3% responderam “sim”.
 
+---
+### Grafico mostrando o resultado em porcentagem de alunos que utilizam o figma para outras funções
 ![imagem exeplo](Screenshots/Resultado1.png)
 
 Esse resultado pode indicar que uma grande parcela dos usuários utiliza o Figma exclusivamente para sua proposta principal, ou ainda que parte do público considera a ferramenta complexa de utilizar, o que pode limitar sua aplicação em outros contextos.
 
 Esse cenário também se relaciona com outro questionamento presente na enquete: “Você utilizaria uma nova versão mais simplificada do Figma e totalmente gratuita?”. O resultado obtido foi expressivo, com 100% dos participantes respondendo “sim”.
+
+---
+### Grafico mostrando 100% de confirmação ao questionamento de uma alternativa gratuita e simplificada
 ![imagem exeplo](Screenshots/Resultado2.png)
 
 Esse resultado pode estar relacionado a mudanças recentes em algumas funcionalidades do Figma, especialmente no setor de prototipagem, que passaram a fazer parte de planos pagos. Essa alteração pode ter dificultado o processo de desenvolvimento para diversos usuários, principalmente aqueles que utilizam a ferramenta para projetos pessoais ou acadêmicos.
@@ -88,7 +93,8 @@ Limitações:
 - Ecossistema limitado de ferramentas de edição
 - Baixa flexibilidade para projetos mais complexos
 - Falta de recursos voltados para prototipagem ou design de interfaces
-
+---
+### Imagem exemplar
 ![imagem exeplo](Screenshots/Netstory.png)
 
 ### 2. Squiffy
@@ -110,7 +116,8 @@ Limitações:
 - Interface pouco intuitiva para iniciantes
 - Pouco suporte a elementos visuais e multimídia
 - Não possui recursos colaborativos em tempo real---
-
+---
+### Imagem exemplar
   ![imagem exeplo](Screenshots/Squiffy.png)
 
 ### 3. Figma
@@ -132,7 +139,8 @@ Limitações:
 - Não voltado para criação narrativa
 - Algumas funcionalidades importantes são pagas
 - Curva de aprendizado relativamente elevada para iniciantes
-
+---
+### Imagem exemplar
   ![imagem exeplo](Screenshots/figma.png)
 
 ### Comparação
@@ -281,7 +289,8 @@ Liste os principais fluxos do sistema.
 - Editar texto
 - Publicar
 - definir categoria (privada/publica)
-- 
+---
+### Caso de uso
 ![imagem exeplo](Screenshots/casodeuso.png)
 
 ---
@@ -468,7 +477,6 @@ O foco inicial será:
 # 3. Fluxos e Comportamento do Sistema
 
 ## 3.1 Fluxo Principal do Usuário
-
 ![imagem exeplo](Screenshots/Fluxoprincipal.png)
 
 ---
