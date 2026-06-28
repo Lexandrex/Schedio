@@ -59,7 +59,7 @@ Entre as perguntas presentes no questionário, uma delas foi: “Você costuma u
 
 Esse resultado pode indicar que uma grande parcela dos usuários utiliza o Figma exclusivamente para sua proposta principal, ou ainda que parte do público considera a ferramenta complexa de utilizar, o que pode limitar sua aplicação em outros contextos.
 
-Esse cenário também se relaciona com outro questionamento presente na enquete: “Você utilizaria uma nova versão mais simplificada do Figma e totalmente gratuita?”. O resultado obtido foi expressivo, com 100% dos participantes respondendo “sim”.
+Esse cenário também se relaciona com outro questionamento presente na enquete: “Você utilizaria uma nova versão mais simplificada do Figma e totalmente gratuita?”. O resultado obtido foi expressivo,como pode ser observado na figura 2, com 100% dos participantes respondendo “sim”.
 
 ---
 ### Grafico mostrando 100% de confirmação ao questionamento de uma alternativa gratuita e simplificada
