@@ -1763,8 +1763,9 @@ Observações:
 
 ---
 
-**Avaliador 2:** __________________________  
-**Status:** [ ] Aprovado  [ ] Ajustar
+**Avaliador 2:** EDICARSIA BARBIERO PILLON
+![Assinatura](Screenshots/ass_edicarsia.png)
+**Status:** [X] Aprovado  [ ] Ajustar
 
 Observações:
 
