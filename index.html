@@ -13,7 +13,7 @@
 
   <body>
     <main class="auth-page">
-      <a class="brand" href="#login" aria-label="Schedio Drasis, voltar ao login">
+      <a class="brand" href="#login" aria-label="Szchedio Drasis, voltar ao login">
         <span class="brand-mark">S</span>
         <span>Schedio Drasis</span>
       </a>
@@ -129,12 +129,35 @@
           </form>
         </div>
 
+        <div class="auth-card" id="verify-email" data-view hidden>
+          <button class="back-button" type="button" data-go="login">← Voltar</button>
+
+          <h1>Confirme seu e-mail</h1>
+          <p class="subtitle">
+            Enviamos um código de 6 dígitos para
+            <strong id="verification-email">seu e-mail</strong>.
+          </p>
+
+          <form class="auth-form" data-auth-form="verification-code">
+            <div class="code-inputs" aria-label="Código de confirmação de e-mail">
+              <input inputmode="numeric" maxlength="1" aria-label="Dígito 1" />
+              <input inputmode="numeric" maxlength="1" aria-label="Dígito 2" />
+              <input inputmode="numeric" maxlength="1" aria-label="Dígito 3" />
+              <input inputmode="numeric" maxlength="1" aria-label="Dígito 4" />
+              <input inputmode="numeric" maxlength="1" aria-label="Dígito 5" />
+              <input inputmode="numeric" maxlength="1" aria-label="Dígito 6" />
+            </div>
+            <button class="primary-button" type="submit">Confirmar e-mail</button>
+          </form>
+          <button class="text-button" type="button" data-resend-verification>Reenviar código</button>
+        </div>
+
         <div class="auth-card" id="recover-code" data-view hidden>
           <button class="back-button" type="button" data-go="recover-email">← Voltar</button>
 
           <h1>Verifique seu e-mail</h1>
           <p class="subtitle">
-            Digite o código de 5 dígitos enviado para
+            Digite o código de 6 dígitos enviado para
             <strong id="recovery-email">seu e-mail</strong>.
           </p>
 
@@ -145,6 +168,7 @@
               <input inputmode="numeric" maxlength="1" aria-label="Dígito 3" />
               <input inputmode="numeric" maxlength="1" aria-label="Dígito 4" />
               <input inputmode="numeric" maxlength="1" aria-label="Dígito 5" />
+              <input inputmode="numeric" maxlength="1" aria-label="Dígito 6" />
             </div>
 
             <button class="primary-button" type="submit">Validar código</button>
@@ -183,6 +207,14 @@
                 minlength="8"
               />
             </label>
+
+            <input
+              class="auth-username"
+              type="email"
+              autocomplete="username"
+              tabindex="-1"
+              aria-hidden="true"
+            />
 
             <button class="primary-button" type="submit">Redefinir senha</button>
           </form>

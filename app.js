@@ -2,6 +2,17 @@ const views = [...document.querySelectorAll('[data-view]')];
 const feedback = document.querySelector('#feedback');
 let recoveryEmail = '';
 let recoveryCode = '';
+let verificationEmail = '';
+
+const apiOrigin =
+  window.location.protocol === 'file:' || window.location.origin === 'null' || window.location.port === '5500'
+    ? 'http://127.0.0.1:4174'
+    : window.location.origin;
+
+function setFeedback(message, type = 'info') {
+  feedback.textContent = message;
+  feedback.dataset.type = type;
+}
 
 function showView(id) {
   views.forEach((view) => {
@@ -10,7 +21,7 @@ function showView(id) {
     view.classList.toggle('active', isActive);
   });
 
-  feedback.textContent = '';
+  setFeedback('', 'info');
   window.location.hash = id;
   document.querySelector(`#${id} input`)?.focus();
 }
@@ -27,19 +38,27 @@ document.querySelectorAll('[data-go]').forEach((button) => {
 });
 
 async function request(endpoint, body) {
-  const response = await fetch(`/api/auth/${endpoint}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+  const url = `${apiOrigin}/api/auth/${endpoint}`;
 
-  const data = await response.json();
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
 
-  if (!response.ok) {
-    throw new Error(data.message || 'Não foi possível concluir a operação.');
+    const contentType = response.headers.get('content-type') || '';
+    const isJson = contentType.includes('application/json');
+    const data = isJson ? await response.json() : null;
+
+    if (!response.ok) {
+      throw new Error(data?.message || response.statusText || 'Não foi possível concluir a operação.');
+    }
+
+    return data;
+  } catch (error) {
+    throw new Error(error?.message || 'Falha na requisição. Verifique sua conexão e tente novamente.');
   }
-
-  return data;
 }
 
 document.querySelector('[data-auth-form="login"]').addEventListener('submit', async (event) => {
@@ -53,9 +72,9 @@ document.querySelector('[data-auth-form="login"]').addEventListener('submit', as
       password: password.value,
     });
 
-    feedback.textContent = `Bem-vindo, ${data.user.email}.`;
+    setFeedback(`Bem-vindo, ${data.user.email}.`, 'success');
   } catch (error) {
-    feedback.textContent = error.message;
+    setFeedback(error.message, 'error');
   }
 });
 
@@ -65,35 +84,42 @@ document.querySelector('[data-auth-form="register"]').addEventListener('submit',
   const [email, password, confirmation] = event.currentTarget.querySelectorAll('input');
 
   if (password.value !== confirmation.value) {
-    feedback.textContent = 'As senhas informadas não coincidem.';
+    setFeedback('As senhas informadas não coincidem.', 'error');
     return;
   }
 
   try {
-    await request('register', {
+    const data = await request('register', {
       email: email.value,
       password: password.value,
     });
 
-    showView('login');
-    feedback.textContent = 'Conta criada. Agora você pode entrar.';
+    verificationEmail = data.user.email;
+    document.querySelector('#verification-email').textContent = verificationEmail;
+    showView('verify-email');
+    setFeedback(data.message, 'success');
   } catch (error) {
-    feedback.textContent = error.message;
+    setFeedback(error.message, 'error');
   }
 });
 
 document.querySelector('[data-auth-form="recovery-email"]').addEventListener('submit', async (event) => {
   event.preventDefault();
 
-  recoveryEmail = event.currentTarget.querySelector('input').value;
+  recoveryEmail = event.currentTarget.querySelector('input').value.trim();
+
+  if (!recoveryEmail || !recoveryEmail.includes('@')) {
+    setFeedback('Informe um e-mail válido.', 'error');
+    return;
+  }
 
   try {
     const data = await request('password-recovery', { email: recoveryEmail });
     document.querySelector('#recovery-email').textContent = recoveryEmail;
     showView('recover-code');
-    feedback.textContent = data.message;
+    setFeedback(data.message, 'success');
   } catch (error) {
-    feedback.textContent = error.message;
+    setFeedback(error.message, 'error');
   }
 });
 
@@ -104,8 +130,8 @@ document.querySelector('[data-auth-form="recovery-code"]').addEventListener('sub
     .map((input) => input.value)
     .join('');
 
-  if (recoveryCode.length !== 5) {
-    feedback.textContent = 'Informe os cinco dígitos do código.';
+  if (recoveryCode.length !== 6) {
+    setFeedback('Informe os seis dígitos do código.', 'error');
     return;
   }
 
@@ -115,19 +141,47 @@ document.querySelector('[data-auth-form="recovery-code"]').addEventListener('sub
       code: recoveryCode,
     });
 
+    document.querySelector('[data-auth-form="reset-password"] .auth-username').value = recoveryEmail;
     showView('reset-password');
   } catch (error) {
-    feedback.textContent = error.message;
+    setFeedback(error.message, 'error');
+  }
+});
+
+document.querySelector('[data-auth-form="verification-code"]').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const code = [...event.currentTarget.querySelectorAll('input')].map((input) => input.value).join('');
+  if (code.length !== 6) {
+    setFeedback('Informe os seis dígitos do código.', 'error');
+    return;
+  }
+
+  try {
+    const data = await request('email-verification/verify', { email: verificationEmail, code });
+    showView('login');
+    setFeedback(data.message, 'success');
+  } catch (error) {
+    setFeedback(error.message, 'error');
+  }
+});
+
+document.querySelector('[data-resend-verification]').addEventListener('click', async () => {
+  try {
+    const data = await request('email-verification/resend', { email: verificationEmail });
+    setFeedback(data.message, 'success');
+  } catch (error) {
+    setFeedback(error.message, 'error');
   }
 });
 
 document.querySelector('[data-auth-form="reset-password"]').addEventListener('submit', async (event) => {
   event.preventDefault();
 
-  const [password, confirmation] = event.currentTarget.querySelectorAll('input');
+  const password = event.currentTarget.querySelector('input[autocomplete="new-password"]');
+  const confirmation = event.currentTarget.querySelectorAll('input[autocomplete="new-password"]')[1];
 
   if (password.value !== confirmation.value) {
-    feedback.textContent = 'As senhas informadas não coincidem.';
+    setFeedback('As senhas informadas não coincidem.', 'error');
     return;
   }
 
@@ -139,9 +193,9 @@ document.querySelector('[data-auth-form="reset-password"]').addEventListener('su
     });
 
     showView('login');
-    feedback.textContent = data.message;
+    setFeedback(data.message, 'success');
   } catch (error) {
-    feedback.textContent = error.message;
+    setFeedback(error.message, 'error');
   }
 });
 
