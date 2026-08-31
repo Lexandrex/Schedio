@@ -36,7 +36,6 @@ body {
 .auth-shell {
   position: relative;
   width: min(100%, 388px);
-  min-height: 560px;
 }
 
 .auth-username {
@@ -75,41 +74,34 @@ body {
 
 /* Auth card */
 .auth-card {
-  position: absolute;
-  inset: 0;
   width: 100%;
-  opacity: 0;
-  pointer-events: none;
   padding: 38px 38px 30px;
   border: 1px solid var(--border-color);
   border-radius: 14px;
   background: var(--bg-panel);
   box-shadow: 0 18px 54px rgb(0 0 0 / 24%);
   text-align: center;
-  transform: translateY(24px) scale(0.98);
-  transition:
-    opacity 0.5s ease,
-    transform 0.5s ease,
-    border-radius 0.5s ease,
-    padding 0.5s ease,
-    box-shadow 0.5s ease,
-    border-color 0.5s ease;
+  animation: card-in 0.4s ease;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
 }
 
-.auth-card.active {
-  opacity: 1;
-  pointer-events: auto;
-  transform: translateY(0) scale(1);
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
-#register.active {
+.auth-card--register {
   border-radius: 24px 24px 10px 10px;
   padding: 44px 38px 34px;
 }
 
-#recover-email.active,
-#recover-code.active,
-#reset-password.active {
+.auth-card--recovery {
   border-radius: 26px 26px 16px 16px;
   padding: 40px 38px 34px;
 }
@@ -271,7 +263,9 @@ a:hover {
   text-decoration: underline;
 }
 
-.text-button:hover { color: #fff; }
+.text-button:hover {
+  color: #fff;
+}
 
 .code-inputs {
   display: flex;

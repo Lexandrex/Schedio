@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "node server.js",
+    "dev:client": "npm --prefix client run dev",
+    "build:client": "npm --prefix client run build",
     "db:migrate": "node scripts/migrate.js",
     "db:verify": "node scripts/verify-migration.js",
     "auth:inspect": "node scripts/inspect-auth-status.js",
@@ -14,6 +16,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.3",
     "nodemailer": "^6.9.5",
     "pg": "^8.13.3"
   }

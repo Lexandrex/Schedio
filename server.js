@@ -7,6 +7,7 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const { query } = require('./db');
+const { signToken, requireAuth } = require('./auth');
 
 const app = express();
 
@@ -19,13 +20,7 @@ function generateEmailCode() {
   return String(crypto.randomInt(100000, 1000000));
 }
 
-async function issueEmailVerification(userId, email) {
-  const code = generateEmailCode();
-  const hash = await bcrypt.hash(code, 10);
-  await query(
-    "UPDATE users SET email_verification_token_hash = $1, email_verification_token_expires_at = NOW() + INTERVAL '15 minutes' WHERE id = $2",
-    [hash, userId],
-  );
+async function sendVerificationEmail(email, code) {
   const result = await mailTransport.sendMail({
     from: process.env.SMTP_FROM || 'no-reply@schediodrasis.local',
     to: email,
@@ -34,6 +29,22 @@ async function issueEmailVerification(userId, email) {
     html: `<p>Olá!</p><p>Use o código abaixo para confirmar seu e-mail no Schedio Drasis:</p><p style="font-size:24px;font-weight:bold;letter-spacing:4px">${code}</p><p>Ele expira em 15 minutos.</p><p>Se você não criou esta conta, ignore esta mensagem.</p>`,
   });
   mailPreviewUrl = nodemailer.getTestMessageUrl(result) || null;
+}
+
+async function issuePendingRegistration(email, senhaHash) {
+  const code = generateEmailCode();
+  const codeHash = await bcrypt.hash(code, 10);
+  await query(
+    `INSERT INTO pending_registrations (email, senha, verification_token_hash, verification_token_expires_at, updated_at)
+     VALUES ($1, $2, $3, NOW() + INTERVAL '15 minutes', NOW())
+     ON CONFLICT (email) DO UPDATE SET
+       senha = EXCLUDED.senha,
+       verification_token_hash = EXCLUDED.verification_token_hash,
+       verification_token_expires_at = EXCLUDED.verification_token_expires_at,
+       updated_at = NOW()`,
+    [email, senhaHash, codeHash],
+  );
+  await sendVerificationEmail(email, code);
 }
 
 async function createMailTransport() {
@@ -71,9 +82,11 @@ async function createMailTransport() {
 
 const port = Number(process.env.PORT || 4173);
 
+const clientDist = path.join(__dirname, 'client', 'dist');
+
 app.use(cors({ origin: process.env.CLIENT_ORIGIN || true }));
 app.use(express.json());
-app.use(express.static(path.join(__dirname)));
+app.use(express.static(clientDist));
 
 app.get('/api/health', async (_request, response, next) => {
   try {
@@ -96,27 +109,27 @@ app.post('/api/auth/register', async (request, response, next) => {
       return response.status(503).json({ message: 'O serviço de e-mail ainda não está configurado. Configure o SMTP para criar uma conta.' });
     }
 
+    const normalizedEmail = email.trim().toLowerCase();
+    const existing = await query('SELECT id FROM users WHERE email = $1', [normalizedEmail]);
+    if (existing.rows[0]) {
+      return response.status(409).json({ message: 'Este e-mail já está cadastrado.' });
+    }
+
     const senhaHash = await bcrypt.hash(password, 12);
-    const result = await query(
-      'INSERT INTO users (email, senha) VALUES ($1, $2) RETURNING id, email',
-      [email.trim().toLowerCase(), senhaHash],
-    );
-    await issueEmailVerification(result.rows[0].id, result.rows[0].email);
+    await issuePendingRegistration(normalizedEmail, senhaHash);
+
     return response.status(201).json({
-      user: result.rows[0],
+      user: { email: normalizedEmail },
       message: 'Conta criada. Enviamos um código de confirmação para seu e-mail.',
       previewUrl: process.env.NODE_ENV === 'development' ? mailPreviewUrl || undefined : undefined,
     });
-  } catch (error) {
-    if (error.code === '23505') return response.status(409).json({ message: 'Este e-mail já está cadastrado.' });
-    return next(error);
-  }
+  } catch (error) { return next(error); }
 });
 
 app.post('/api/auth/login', async (request, response, next) => {
   try {
     const { email, password } = request.body;
-    const result = await query('SELECT id, email, senha, email_verified_at FROM users WHERE email = $1', [email?.trim().toLowerCase()]);
+    const result = await query('SELECT id, email, senha FROM users WHERE email = $1', [email?.trim().toLowerCase()]);
     const user = result.rows[0];
 
     if (!user) {
@@ -128,11 +141,17 @@ app.post('/api/auth/login', async (request, response, next) => {
       return response.status(401).json({ message: 'Senha incorreta.' });
     }
 
-    if (!user.email_verified_at) {
-      return response.status(403).json({ message: 'Confirme seu e-mail antes de entrar.' });
-    }
+    const token = signToken(user);
+    return response.json({ user: { id: user.id, email: user.email }, token });
+  } catch (error) { return next(error); }
+});
 
-    return response.json({ user: { id: user.id, email: user.email } });
+app.get('/api/auth/me', requireAuth, async (request, response, next) => {
+  try {
+    const result = await query('SELECT id, email FROM users WHERE id = $1', [request.userId]);
+    const user = result.rows[0];
+    if (!user) return response.status(401).json({ message: 'Sessão inválida ou expirada.' });
+    return response.json({ user });
   } catch (error) { return next(error); }
 });
 
@@ -140,10 +159,17 @@ app.post('/api/auth/email-verification/resend', async (request, response, next) 
   try {
     if (!mailTransport) return response.status(503).json({ message: 'O serviço de e-mail ainda não está configurado.' });
     const email = request.body.email?.trim().toLowerCase();
-    const result = await query('SELECT id, email, email_verified_at FROM users WHERE email = $1', [email]);
-    const user = result.rows[0];
-    if (!user || user.email_verified_at) return response.json({ message: 'Se necessário, enviaremos um novo código de confirmação.' });
-    await issueEmailVerification(user.id, user.email);
+    const pending = await query('SELECT email FROM pending_registrations WHERE email = $1', [email]);
+    if (!pending.rows[0]) return response.json({ message: 'Se necessário, enviaremos um novo código de confirmação.' });
+
+    const code = generateEmailCode();
+    const codeHash = await bcrypt.hash(code, 10);
+    await query(
+      "UPDATE pending_registrations SET verification_token_hash = $1, verification_token_expires_at = NOW() + INTERVAL '15 minutes', updated_at = NOW() WHERE email = $2",
+      [codeHash, email],
+    );
+    await sendVerificationEmail(email, code);
+
     return response.json({
       message: 'Enviamos um novo código de confirmação para seu e-mail.',
       previewUrl: process.env.NODE_ENV === 'development' ? mailPreviewUrl || undefined : undefined,
@@ -156,19 +182,22 @@ app.post('/api/auth/email-verification/verify', async (request, response, next) 
     const email = request.body.email?.trim().toLowerCase();
     const code = request.body.code;
     const result = await query(
-      'SELECT id, email_verification_token_hash FROM users WHERE email = $1 AND email_verified_at IS NULL AND email_verification_token_expires_at > NOW() LIMIT 1',
+      'SELECT senha, verification_token_hash FROM pending_registrations WHERE email = $1 AND verification_token_expires_at > NOW() LIMIT 1',
       [email],
     );
-    const user = result.rows[0];
-    if (!user || !await bcrypt.compare(code || '', user.email_verification_token_hash)) {
+    const pending = result.rows[0];
+    if (!pending || !await bcrypt.compare(code || '', pending.verification_token_hash)) {
       return response.status(400).json({ message: 'Código inválido ou expirado.' });
     }
-    await query(
-      'UPDATE users SET email_verified_at = NOW(), email_verification_token_hash = NULL, email_verification_token_expires_at = NULL, updated_at = NOW() WHERE id = $1',
-      [user.id],
-    );
+
+    await query('INSERT INTO users (email, senha, email_verified_at) VALUES ($1, $2, NOW())', [email, pending.senha]);
+    await query('DELETE FROM pending_registrations WHERE email = $1', [email]);
+
     return response.json({ message: 'E-mail confirmado. Agora você já pode entrar.' });
-  } catch (error) { return next(error); }
+  } catch (error) {
+    if (error.code === '23505') return response.status(409).json({ message: 'Este e-mail já está cadastrado.' });
+    return next(error);
+  }
 });
 
 app.post('/api/auth/password-recovery', async (request, response, next) => {
@@ -278,6 +307,10 @@ app.post('/api/auth/password-recovery/reset', async (request, response, next) =>
     );
     return response.json({ message: 'Senha atualizada com sucesso.' });
   } catch (error) { return next(error); }
+});
+
+app.get(/^(?!\/api\/).*/, (_request, response) => {
+  response.sendFile(path.join(clientDist, 'index.html'));
 });
 
 app.use((error, _request, response, _next) => {
