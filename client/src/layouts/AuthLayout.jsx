@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Link, Outlet, useLocation } from 'react-router-dom'
+import { Link, Navigate, Outlet, useLocation } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext.jsx'
 
 export default function AuthLayout() {
   const location = useLocation()
+  const { user, isLoading } = useAuth()
   const [feedback, setFeedback] = useState({ message: '', type: 'info' })
 
   useEffect(() => {
@@ -11,6 +13,14 @@ export default function AuthLayout() {
       type: location.state?.feedbackType || 'info',
     })
   }, [location.pathname])
+
+  if (isLoading) {
+    return null
+  }
+
+  if (user) {
+    return <Navigate to="/" replace />
+  }
 
   return (
     <main className="auth-page">

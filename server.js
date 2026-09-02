@@ -200,6 +200,19 @@ app.post('/api/auth/email-verification/verify', async (request, response, next) 
   }
 });
 
+app.get('/api/projects', requireAuth, async (_request, response, next) => {
+  try {
+    const result = await query(
+      `SELECT p.id, p.titulo, p.categoria, p.capa, p.criado, p.likes, u.nome AS autor_nome, u.email AS autor_email
+       FROM projetos p
+       JOIN users u ON u.id = p.usuario_id
+       WHERE p.status = 'publicado'
+       ORDER BY p.criado DESC`,
+    );
+    return response.json({ projects: result.rows });
+  } catch (error) { return next(error); }
+});
+
 app.post('/api/auth/password-recovery', async (request, response, next) => {
   try {
     const email = request.body.email?.trim().toLowerCase();

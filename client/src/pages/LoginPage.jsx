@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { Link, useOutletContext } from 'react-router-dom'
+import { Link, useNavigate, useOutletContext } from 'react-router-dom'
 import { authRequest } from '../api.js'
 import { useAuth } from '../context/AuthContext.jsx'
 
 export default function LoginPage() {
   const { setFeedback } = useOutletContext()
-  const { user, isLoading, login, logout } = useAuth()
+  const { login } = useAuth()
+  const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
 
@@ -15,33 +16,10 @@ export default function LoginPage() {
     try {
       const data = await authRequest('login', { email, password })
       login(data.user, data.token)
-      setFeedback({ message: `Bem-vindo, ${data.user.email}.`, type: 'success' })
+      navigate('/')
     } catch (error) {
       setFeedback({ message: error.message, type: 'error' })
     }
-  }
-
-  if (isLoading) {
-    return <div className="auth-card" />
-  }
-
-  if (user) {
-    return (
-      <div className="auth-card">
-        <div className="avatar" aria-hidden="true">
-          <span></span>
-        </div>
-
-        <h1>Sessão ativa</h1>
-        <p className="subtitle">
-          Você está conectado como <strong>{user.email}</strong>.
-        </p>
-
-        <button className="primary-button" type="button" onClick={logout}>
-          Sair
-        </button>
-      </div>
-    )
   }
 
   return (
