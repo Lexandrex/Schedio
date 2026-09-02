@@ -148,10 +148,52 @@ app.post('/api/auth/login', async (request, response, next) => {
 
 app.get('/api/auth/me', requireAuth, async (request, response, next) => {
   try {
-    const result = await query('SELECT id, email FROM users WHERE id = $1', [request.userId]);
+    const result = await query('SELECT id, email, nome, bio, cor FROM users WHERE id = $1', [request.userId]);
     const user = result.rows[0];
     if (!user) return response.status(401).json({ message: 'Sessão inválida ou expirada.' });
     return response.json({ user });
+  } catch (error) { return next(error); }
+});
+
+const HEX_COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
+
+app.patch('/api/users/me', requireAuth, async (request, response, next) => {
+  try {
+    const nome = (request.body.nome || '').trim();
+    const bio = (request.body.bio || '').trim();
+    const cor = request.body.cor || null;
+
+    if (!nome || nome.length > 80) {
+      return response.status(400).json({ message: 'Informe um nome de até 80 caracteres.' });
+    }
+    if (bio.length > 280) {
+      return response.status(400).json({ message: 'A descrição deve ter até 280 caracteres.' });
+    }
+    if (cor && !HEX_COLOR_PATTERN.test(cor)) {
+      return response.status(400).json({ message: 'Informe uma cor válida no formato #RRGGBB.' });
+    }
+
+    const result = await query(
+      'UPDATE users SET nome = $1, bio = $2, cor = $3 WHERE id = $4 RETURNING id, email, nome, bio, cor',
+      [nome, bio, cor, request.userId],
+    );
+    return response.json({ user: result.rows[0] });
+  } catch (error) { return next(error); }
+});
+
+app.delete('/api/users/me', requireAuth, async (request, response, next) => {
+  try {
+    const result = await query('SELECT senha FROM users WHERE id = $1', [request.userId]);
+    const user = result.rows[0];
+    if (!user) return response.status(401).json({ message: 'Sessão inválida ou expirada.' });
+
+    const validPassword = await bcrypt.compare(request.body.password || '', user.senha);
+    if (!validPassword) {
+      return response.status(401).json({ message: 'Senha incorreta.' });
+    }
+
+    await query('DELETE FROM users WHERE id = $1', [request.userId]);
+    return response.status(204).send();
   } catch (error) { return next(error); }
 });
 

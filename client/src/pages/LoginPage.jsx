@@ -15,7 +15,7 @@ export default function LoginPage() {
 
     try {
       const data = await authRequest('login', { email, password })
-      login(data.user, data.token)
+      await login(data.token)
       navigate('/')
     } catch (error) {
       setFeedback({ message: error.message, type: 'error' })

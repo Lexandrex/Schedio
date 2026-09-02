@@ -20,9 +20,14 @@ export function AuthProvider({ children }) {
       .finally(() => setIsLoading(false))
   }, [])
 
-  function login(nextUser, token) {
+  async function login(token) {
     setToken(token)
-    setUser(nextUser)
+    const data = await apiRequest('/api/auth/me')
+    setUser(data.user)
+  }
+
+  function updateUser(patch) {
+    setUser((current) => (current ? { ...current, ...patch } : current))
   }
 
   function logout() {
@@ -31,7 +36,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout }}>
+    <AuthContext.Provider value={{ user, isLoading, login, updateUser, logout }}>
       {children}
     </AuthContext.Provider>
   )

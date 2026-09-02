@@ -8,6 +8,12 @@ export default function AuthLayout() {
   const [feedback, setFeedback] = useState({ message: '', type: 'info' })
 
   useEffect(() => {
+    if (sessionStorage.getItem('schedio.accountDeleted')) {
+      sessionStorage.removeItem('schedio.accountDeleted')
+      setFeedback({ message: 'Conta excluída com sucesso.', type: 'success' })
+      return
+    }
+
     setFeedback({
       message: location.state?.feedback || '',
       type: location.state?.feedbackType || 'info',

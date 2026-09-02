@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { apiRequest } from '../api.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import UserIcon from '../components/UserIcon.jsx'
@@ -78,6 +79,9 @@ export default function HomePage() {
           {menuOpen && (
             <div className="avatar-dropdown" role="menu">
               <p className="avatar-dropdown-email">{user.email}</p>
+              <Link to="/conta" onClick={() => setMenuOpen(false)}>
+                Conta
+              </Link>
               <button type="button" onClick={logout}>
                 Sair
               </button>
