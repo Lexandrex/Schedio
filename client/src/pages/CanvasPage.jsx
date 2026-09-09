@@ -30,6 +30,7 @@ export default function CanvasPage() {
 
   const [isDirty, setIsDirty] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [isPublishing, setIsPublishing] = useState(false)
   const [savedAt, setSavedAt] = useState(null)
 
   const elementsRef = useRef(elements)
@@ -64,12 +65,36 @@ export default function CanvasPage() {
       setIsDirty(false)
       setSavedAt(new Date())
       setError('')
+      return true
     } catch (requestError) {
       setError(requestError.message)
+      return false
     } finally {
       setIsSaving(false)
     }
   }, [id])
+
+  const toggleStatus = useCallback(async () => {
+    const status = project?.status === 'publicado' ? 'privado' : 'publicado'
+    setIsPublishing(true)
+
+    try {
+      // Publica sempre o que está salvo: grava as alterações pendentes antes.
+      if (dirtyRef.current && !(await save())) return
+
+      const data = await apiRequest(`/api/projects/${id}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      })
+      setProject((current) => ({ ...current, status: data.project.status }))
+      setError('')
+    } catch (requestError) {
+      setError(requestError.message)
+    } finally {
+      setIsPublishing(false)
+    }
+  }, [id, project?.status, save])
 
   // Salvamento automático a cada 10 segundos, apenas quando há alterações pendentes.
   useEffect(() => {
@@ -171,8 +196,29 @@ export default function CanvasPage() {
 
         <div className="canvas-title">
           <h1>{project.titulo}</h1>
+          <span className={`status-chip status-chip--${project.status}`}>
+            {project.status === 'publicado' ? 'Público' : 'Privado'}
+          </span>
           <span className={`canvas-save-state${isDirty ? ' dirty' : ''}`}>{saveLabel()}</span>
         </div>
+
+        <button
+          className="text-button canvas-publish"
+          type="button"
+          onClick={toggleStatus}
+          disabled={isPublishing}
+          title={
+            project.status === 'publicado'
+              ? 'Deixar de exibir o projeto na tela inicial'
+              : 'Publicar para que outros usuários possam ver'
+          }
+        >
+          {isPublishing
+            ? 'Alterando...'
+            : project.status === 'publicado'
+              ? 'Tornar privado'
+              : 'Publicar'}
+        </button>
 
         <button className="primary-button canvas-save" type="button" onClick={save} disabled={isSaving}>
           Salvar

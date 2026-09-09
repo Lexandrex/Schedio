@@ -5,7 +5,7 @@ import AccountMenu from '../components/AccountMenu.jsx'
 import TrashIcon from '../components/TrashIcon.jsx'
 
 const STATUS_LABEL = {
-  publicado: 'Publicado',
+  publicado: 'Público',
   privado: 'Privado',
 }
 
@@ -26,6 +26,7 @@ export default function EditorPage() {
 
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isPublishing, setIsPublishing] = useState(false)
 
   useEffect(() => {
     apiRequest('/api/projects/mine')
@@ -67,6 +68,27 @@ export default function EditorPage() {
       setFormError(requestError.message)
     } finally {
       setIsCreating(false)
+    }
+  }
+
+  async function toggleStatus(project) {
+    const status = project.status === 'publicado' ? 'privado' : 'publicado'
+    setIsPublishing(true)
+    setError('')
+
+    try {
+      const data = await apiRequest(`/api/projects/${project.id}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      })
+      setProjects((current) =>
+        current.map((item) => (item.id === project.id ? { ...item, status: data.project.status } : item)),
+      )
+    } catch (requestError) {
+      setError(requestError.message)
+    } finally {
+      setIsPublishing(false)
     }
   }
 
@@ -139,11 +161,23 @@ export default function EditorPage() {
               style={project.capa ? { backgroundImage: `url(${project.capa})` } : undefined}
             />
             <div className="editor-card-footer">
-              <p className="editor-card-status">{STATUS_LABEL[project.status] || project.status}</p>
+              <span className={`status-chip status-chip--${project.status}`}>
+                {STATUS_LABEL[project.status] || project.status}
+              </span>
               {project.id === selectedId && (
-                <Link className="editor-card-open" to={`/editor/${project.id}`}>
-                  Abrir
-                </Link>
+                <div className="editor-card-actions">
+                  <button
+                    className="editor-card-open"
+                    type="button"
+                    disabled={isPublishing}
+                    onClick={() => toggleStatus(project)}
+                  >
+                    {project.status === 'publicado' ? 'Tornar privado' : 'Publicar'}
+                  </button>
+                  <Link className="editor-card-open" to={`/editor/${project.id}`}>
+                    Abrir
+                  </Link>
+                </div>
               )}
             </div>
           </article>

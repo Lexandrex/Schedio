@@ -309,6 +309,39 @@ app.get('/api/projects/:id', requireAuth, async (request, response, next) => {
   }
 });
 
+app.patch('/api/projects/:id/status', requireAuth, async (request, response, next) => {
+  try {
+    const { status } = request.body;
+    if (status !== 'privado' && status !== 'publicado') {
+      return response.status(400).json({ message: 'Status inválido.' });
+    }
+
+    const current = await query(
+      'SELECT conteudo FROM projetos WHERE id = $1 AND usuario_id = $2',
+      [request.params.id, request.userId],
+    );
+    if (!current.rows[0]) {
+      return response.status(404).json({ message: 'Projeto não encontrado.' });
+    }
+
+    // RN-08: um projeto precisa ter conteúdo para ser publicado.
+    if (status === 'publicado' && !current.rows[0].conteudo?.elements?.length) {
+      return response.status(400).json({
+        message: 'Adicione ao menos um elemento ao projeto antes de publicá-lo.',
+      });
+    }
+
+    const result = await query(
+      'UPDATE projetos SET status = $1 WHERE id = $2 AND usuario_id = $3 RETURNING id, titulo, status',
+      [status, request.params.id, request.userId],
+    );
+    return response.json({ project: result.rows[0] });
+  } catch (error) {
+    if (error.code === '22P02') return response.status(404).json({ message: 'Projeto não encontrado.' });
+    return next(error);
+  }
+});
+
 app.put('/api/projects/:id/conteudo', requireAuth, async (request, response, next) => {
   try {
     const { conteudo } = request.body;

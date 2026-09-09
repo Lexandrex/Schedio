@@ -506,6 +506,8 @@ a:hover {
 .editor-card {
   display: grid;
   gap: 8px;
+  /* Sem isso o item do grid é dimensionado pelo conteúdo e estoura a coluna. */
+  min-width: 0;
 }
 
 .editor-card-title {
@@ -536,11 +538,6 @@ a:hover {
   box-shadow: 0 0 0 2px var(--accent);
 }
 
-.editor-card-status {
-  margin: 0;
-  font-size: 0.72rem;
-  color: var(--text-secondary);
-}
 
 .trash-area {
   position: fixed;
@@ -600,21 +597,56 @@ a:hover {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  /* Os rótulos não quebram no meio, então a linha precisa poder quebrar:
+     em card estreito ("Tornar privado" + "Abrir") as ações descem para baixo do status. */
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.editor-card-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .editor-card-open {
+  font: inherit;
   font-size: 0.74rem;
   text-decoration: none;
   color: var(--text-muted);
+  background: transparent;
   border: 1px solid var(--border-color);
   border-radius: 6px;
   padding: 3px 10px;
+  cursor: pointer;
+  white-space: nowrap;
 }
 
 .editor-card-open:hover {
   color: #fff;
   border-color: var(--border-strong);
+}
+
+.editor-card-open:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Status público/privado */
+.status-chip {
+  padding: 2px 9px;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+
+.status-chip--publicado {
+  border-color: #4f7a5c;
+  background: #2c3f33;
+  color: #b6e0c2;
 }
 
 /* Canvas / editor de projeto */
@@ -665,6 +697,10 @@ a:hover {
 .canvas-save {
   margin-top: 0;
   padding: 0 20px;
+}
+
+.canvas-publish {
+  margin-top: 0;
 }
 
 .canvas-error {
