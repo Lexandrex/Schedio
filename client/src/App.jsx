@@ -3,6 +3,7 @@ import AuthLayout from './layouts/AuthLayout.jsx'
 import RequireAuth from './routes/RequireAuth.jsx'
 import HomePage from './pages/HomePage.jsx'
 import EditorPage from './pages/EditorPage.jsx'
+import CanvasPage from './pages/CanvasPage.jsx'
 import AccountPage from './pages/AccountPage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import RegisterPage from './pages/RegisterPage.jsx'
@@ -17,6 +18,7 @@ export default function App() {
       <Route element={<RequireAuth />}>
         <Route path="/" element={<HomePage />} />
         <Route path="editor" element={<EditorPage />} />
+        <Route path="editor/:id" element={<CanvasPage />} />
         <Route path="conta" element={<AccountPage />} />
       </Route>
 

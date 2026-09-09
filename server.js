@@ -85,7 +85,7 @@ const port = Number(process.env.PORT || 4173);
 const clientDist = path.join(__dirname, 'client', 'dist');
 
 app.use(cors({ origin: process.env.CLIENT_ORIGIN || true }));
-app.use(express.json());
+app.use(express.json({ limit: '2mb' }));
 app.use(express.static(clientDist));
 
 app.get('/api/health', async (_request, response, next) => {
@@ -289,6 +289,45 @@ app.post('/api/projects', requireAuth, async (request, response, next) => {
     );
     return response.status(201).json({ project: result.rows[0] });
   } catch (error) { return next(error); }
+});
+
+app.get('/api/projects/:id', requireAuth, async (request, response, next) => {
+  try {
+    const result = await query(
+      `SELECT id, titulo, descricao, categoria, capa, status, likes, criado, conteudo
+       FROM projetos
+       WHERE id = $1 AND usuario_id = $2`,
+      [request.params.id, request.userId],
+    );
+    if (!result.rows[0]) {
+      return response.status(404).json({ message: 'Projeto não encontrado.' });
+    }
+    return response.json({ project: result.rows[0] });
+  } catch (error) {
+    if (error.code === '22P02') return response.status(404).json({ message: 'Projeto não encontrado.' });
+    return next(error);
+  }
+});
+
+app.put('/api/projects/:id/conteudo', requireAuth, async (request, response, next) => {
+  try {
+    const { conteudo } = request.body;
+    if (!conteudo || typeof conteudo !== 'object' || !Array.isArray(conteudo.elements)) {
+      return response.status(400).json({ message: 'Conteúdo do projeto inválido.' });
+    }
+
+    const result = await query(
+      'UPDATE projetos SET conteudo = $1 WHERE id = $2 AND usuario_id = $3',
+      [conteudo, request.params.id, request.userId],
+    );
+    if (!result.rowCount) {
+      return response.status(404).json({ message: 'Projeto não encontrado.' });
+    }
+    return response.status(204).send();
+  } catch (error) {
+    if (error.code === '22P02') return response.status(404).json({ message: 'Projeto não encontrado.' });
+    return next(error);
+  }
 });
 
 app.delete('/api/projects/:id', requireAuth, async (request, response, next) => {

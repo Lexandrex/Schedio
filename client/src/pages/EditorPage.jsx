@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { apiRequest } from '../api.js'
 import AccountMenu from '../components/AccountMenu.jsx'
 import TrashIcon from '../components/TrashIcon.jsx'
@@ -10,6 +10,7 @@ const STATUS_LABEL = {
 }
 
 export default function EditorPage() {
+  const navigate = useNavigate()
   const [projects, setProjects] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
@@ -129,13 +130,22 @@ export default function EditorPage() {
               className="editor-card-cover"
               type="button"
               aria-pressed={project.id === selectedId}
+              title="Clique para selecionar, duplo clique para abrir"
               onClick={() => {
                 setConfirmDelete(false)
                 setSelectedId((current) => (current === project.id ? null : project.id))
               }}
+              onDoubleClick={() => navigate(`/editor/${project.id}`)}
               style={project.capa ? { backgroundImage: `url(${project.capa})` } : undefined}
             />
-            <p className="editor-card-status">{STATUS_LABEL[project.status] || project.status}</p>
+            <div className="editor-card-footer">
+              <p className="editor-card-status">{STATUS_LABEL[project.status] || project.status}</p>
+              {project.id === selectedId && (
+                <Link className="editor-card-open" to={`/editor/${project.id}`}>
+                  Abrir
+                </Link>
+              )}
+            </div>
           </article>
         ))}
       </div>
