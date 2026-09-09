@@ -1,3 +1,5 @@
+import { DEFAULT_FONT_FAMILY, DEFAULT_LINE_HEIGHT } from './textMetrics.js'
+
 export const TOOLS = {
   select: 'select',
   rect: 'rect',
@@ -39,7 +41,17 @@ export function createText(x, y) {
     x,
     y,
     text: 'Novo texto',
+    // Sem largura/altura o texto se ajusta ao conteúdo; ao redimensionar, ele reflui na caixa.
+    width: null,
+    height: null,
     fontSize: 24,
+    fontFamily: DEFAULT_FONT_FAMILY,
+    fontWeight: 'normal',
+    fontStyle: 'normal',
+    textDecoration: 'none',
+    textAlign: 'left',
+    verticalAlign: 'top',
+    lineHeight: DEFAULT_LINE_HEIGHT,
     fill: DEFAULT_TEXT_FILL,
     opacity: 1,
   }

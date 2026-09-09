@@ -1,5 +1,6 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { TOOLS, createShape, createText, isShape, normalizeRect } from './elements.js'
+import { measureText, textStyle } from './textMetrics.js'
 
 const MIN_ZOOM = 0.15
 const MAX_ZOOM = 4
@@ -20,7 +21,6 @@ export default function CanvasStage({
   const svgRef = useRef(null)
   const dragRef = useRef(null)
   const [draft, setDraft] = useState(null)
-  const [textBoxes, setTextBoxes] = useState({})
 
   const selected = elements.find((element) => element.id === selectedId) || null
 
@@ -32,22 +32,6 @@ export default function CanvasStage({
       y: (event.clientY - rect.top - view.y) / view.zoom,
     }
   }
-
-  // Mede os textos renderizados para desenhar o contorno de seleção no tamanho certo.
-  useLayoutEffect(() => {
-    const svg = svgRef.current
-    if (!svg) return
-
-    const measured = {}
-    elements.forEach((element) => {
-      if (element.type !== TOOLS.text) return
-      const node = svg.querySelector(`[data-el="${element.id}"]`)
-      if (!node) return
-      const box = node.getBBox()
-      measured[element.id] = { width: box.width, height: box.height }
-    })
-    setTextBoxes(measured)
-  }, [elements])
 
   function handlePointerDown(event) {
     if (event.button !== 0) return
@@ -62,7 +46,9 @@ export default function CanvasStage({
     }
 
     if (handle && selected) {
-      dragRef.current = { mode: 'resize', handle, origin: { ...selected }, start: point }
+      // A caixa medida garante largura/altura concretas mesmo em texto com tamanho automático.
+      const origin = { ...selected, ...selectionBox(selected) }
+      dragRef.current = { mode: 'resize', handle, origin, start: point }
       return
     }
 
@@ -207,13 +193,8 @@ export default function CanvasStage({
     if (isShape(element)) {
       return { x: element.x, y: element.y, width: element.width, height: element.height }
     }
-    const measured = textBoxes[element.id]
-    return {
-      x: element.x,
-      y: element.y,
-      width: measured?.width || 0,
-      height: measured?.height || element.fontSize,
-    }
+    const metrics = measureText(element)
+    return { x: element.x, y: element.y, width: metrics.width, height: metrics.height }
   }
 
   const cursor = tool === TOOLS.select ? 'default' : 'crosshair'
@@ -305,20 +286,55 @@ export default function CanvasStage({
             )
           }
 
+          const style = textStyle(element)
+          const metrics = measureText(element)
+          const anchor =
+            style.textAlign === 'center' ? 'middle' : style.textAlign === 'right' ? 'end' : 'start'
+          const anchorX =
+            style.textAlign === 'center'
+              ? element.x + metrics.width / 2
+              : style.textAlign === 'right'
+                ? element.x + metrics.width
+                : element.x
+
+          const sobra = metrics.height - metrics.contentHeight
+          const offsetY =
+            style.verticalAlign === 'middle'
+              ? sobra / 2
+              : style.verticalAlign === 'bottom'
+                ? sobra
+                : 0
+
           return (
-            <text
-              key={element.id}
-              data-el={element.id}
-              x={element.x}
-              y={element.y}
-              fill={element.fill}
-              fontSize={element.fontSize}
-              opacity={element.opacity}
-              dominantBaseline="hanging"
-              style={{ userSelect: 'none' }}
-            >
-              {element.text}
-            </text>
+            <g key={element.id} opacity={element.opacity}>
+              {/* Área de clique do bloco inteiro, inclusive linhas vazias. */}
+              <rect
+                data-el={element.id}
+                x={element.x}
+                y={element.y}
+                width={Math.max(metrics.width, 8)}
+                height={Math.max(metrics.height, element.fontSize)}
+                fill="transparent"
+              />
+              <text
+                fill={element.fill}
+                fontSize={element.fontSize}
+                fontFamily={style.fontFamily}
+                fontWeight={style.fontWeight}
+                fontStyle={style.fontStyle}
+                textDecoration={style.textDecoration}
+                textAnchor={anchor}
+                dominantBaseline="hanging"
+                pointerEvents="none"
+                style={{ userSelect: 'none' }}
+              >
+                {metrics.lines.map((line, index) => (
+                  <tspan key={index} x={anchorX} y={element.y + offsetY + index * metrics.lineHeight}>
+                    {line}
+                  </tspan>
+                ))}
+              </text>
+            </g>
           )
         })}
 
@@ -343,8 +359,7 @@ export default function CanvasStage({
               stroke="#aaa1b5"
               strokeWidth={1.5 / view.zoom}
             />
-            {isShape(selected) &&
-              HANDLES.map((handle) => {
+            {HANDLES.map((handle) => {
                 const box = selectionBox(selected)
                 const size = 8 / view.zoom
                 const positions = {
