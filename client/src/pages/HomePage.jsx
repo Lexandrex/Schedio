@@ -1,18 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { apiRequest } from '../api.js'
-import { useAuth } from '../context/AuthContext.jsx'
-import UserIcon from '../components/UserIcon.jsx'
+import AccountMenu from '../components/AccountMenu.jsx'
 
 export default function HomePage() {
-  const { user, logout } = useAuth()
   const [projects, setProjects] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
   const [activeCategory, setActiveCategory] = useState('Todos')
-  const [menuOpen, setMenuOpen] = useState(false)
-  const menuRef = useRef(null)
 
   useEffect(() => {
     apiRequest('/api/projects')
@@ -20,19 +16,6 @@ export default function HomePage() {
       .catch((requestError) => setError(requestError.message))
       .finally(() => setIsLoading(false))
   }, [])
-
-  useEffect(() => {
-    if (!menuOpen) return undefined
-
-    function handleClickOutside(event) {
-      if (menuRef.current && !menuRef.current.contains(event.target)) {
-        setMenuOpen(false)
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [menuOpen])
 
   const categories = useMemo(() => {
     const unique = [...new Set(projects.map((project) => project.categoria).filter(Boolean))]
@@ -64,30 +47,10 @@ export default function HomePage() {
           onChange={(event) => setSearch(event.target.value)}
         />
 
-        <div className="avatar-menu" ref={menuRef}>
-          <button
-            className="avatar-button"
-            type="button"
-            onClick={() => setMenuOpen((open) => !open)}
-            aria-haspopup="true"
-            aria-expanded={menuOpen}
-            aria-label="Menu da conta"
-          >
-            <UserIcon />
-          </button>
-
-          {menuOpen && (
-            <div className="avatar-dropdown" role="menu">
-              <p className="avatar-dropdown-email">{user.email}</p>
-              <Link to="/conta" onClick={() => setMenuOpen(false)}>
-                Conta
-              </Link>
-              <button type="button" onClick={logout}>
-                Sair
-              </button>
-            </div>
-          )}
-        </div>
+        <AccountMenu>
+          <Link to="/editor">Editor</Link>
+          <Link to="/conta">Conta</Link>
+        </AccountMenu>
       </header>
 
       {categories.length > 1 && (

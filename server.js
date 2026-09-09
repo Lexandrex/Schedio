@@ -255,6 +255,58 @@ app.get('/api/projects', requireAuth, async (_request, response, next) => {
   } catch (error) { return next(error); }
 });
 
+app.get('/api/projects/mine', requireAuth, async (request, response, next) => {
+  try {
+    const result = await query(
+      `SELECT id, titulo, descricao, categoria, capa, status, likes, criado
+       FROM projetos
+       WHERE usuario_id = $1
+       ORDER BY criado DESC`,
+      [request.userId],
+    );
+    return response.json({ projects: result.rows });
+  } catch (error) { return next(error); }
+});
+
+app.post('/api/projects', requireAuth, async (request, response, next) => {
+  try {
+    const titulo = (request.body.titulo || '').trim();
+    const descricao = (request.body.descricao || '').trim();
+    const categoria = (request.body.categoria || '').trim();
+
+    if (!titulo || titulo.length > 160) {
+      return response.status(400).json({ message: 'Informe um título de até 160 caracteres.' });
+    }
+    if (categoria.length > 60) {
+      return response.status(400).json({ message: 'A categoria deve ter até 60 caracteres.' });
+    }
+
+    const result = await query(
+      `INSERT INTO projetos (usuario_id, titulo, descricao, categoria)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, titulo, descricao, categoria, capa, status, likes, criado`,
+      [request.userId, titulo, descricao || null, categoria || null],
+    );
+    return response.status(201).json({ project: result.rows[0] });
+  } catch (error) { return next(error); }
+});
+
+app.delete('/api/projects/:id', requireAuth, async (request, response, next) => {
+  try {
+    const result = await query(
+      'DELETE FROM projetos WHERE id = $1 AND usuario_id = $2',
+      [request.params.id, request.userId],
+    );
+    if (!result.rowCount) {
+      return response.status(404).json({ message: 'Projeto não encontrado.' });
+    }
+    return response.status(204).send();
+  } catch (error) {
+    if (error.code === '22P02') return response.status(404).json({ message: 'Projeto não encontrado.' });
+    return next(error);
+  }
+});
+
 app.post('/api/auth/password-recovery', async (request, response, next) => {
   try {
     const email = request.body.email?.trim().toLowerCase();

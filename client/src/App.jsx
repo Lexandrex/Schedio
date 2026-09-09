@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import AuthLayout from './layouts/AuthLayout.jsx'
 import RequireAuth from './routes/RequireAuth.jsx'
 import HomePage from './pages/HomePage.jsx'
+import EditorPage from './pages/EditorPage.jsx'
 import AccountPage from './pages/AccountPage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import RegisterPage from './pages/RegisterPage.jsx'
@@ -15,6 +16,7 @@ export default function App() {
     <Routes>
       <Route element={<RequireAuth />}>
         <Route path="/" element={<HomePage />} />
+        <Route path="editor" element={<EditorPage />} />
         <Route path="conta" element={<AccountPage />} />
       </Route>
 
