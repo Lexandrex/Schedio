@@ -309,6 +309,31 @@ app.get('/api/projects/:id', requireAuth, async (request, response, next) => {
   }
 });
 
+/**
+ * Leitura pública de um projeto publicado (RN-07). Diferente de
+ * `GET /api/projects/:id`, que é exclusivo do dono para edição: aqui qualquer
+ * usuário autenticado lê, mas só se o projeto estiver publicado.
+ */
+app.get('/api/projects/:id/leitura', requireAuth, async (request, response, next) => {
+  try {
+    const result = await query(
+      `SELECT p.id, p.titulo, p.descricao, p.categoria, p.capa, p.criado, p.likes, p.conteudo,
+              u.nome AS autor_nome, u.email AS autor_email, u.bio AS autor_bio
+       FROM projetos p
+       JOIN users u ON u.id = p.usuario_id
+       WHERE p.id = $1 AND p.status = 'publicado'`,
+      [request.params.id],
+    );
+    if (!result.rows[0]) {
+      return response.status(404).json({ message: 'Projeto não encontrado ou não publicado.' });
+    }
+    return response.json({ project: result.rows[0] });
+  } catch (error) {
+    if (error.code === '22P02') return response.status(404).json({ message: 'Projeto não encontrado ou não publicado.' });
+    return next(error);
+  }
+});
+
 app.patch('/api/projects/:id/status', requireAuth, async (request, response, next) => {
   try {
     const { status } = request.body;

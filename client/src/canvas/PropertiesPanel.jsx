@@ -1,7 +1,9 @@
-import { TOOLS, isShape } from './elements.js'
+import { TOOLS, hasBox, isScreen } from './elements.js'
+import { TRANSITIONS } from './connections.js'
 import { FONT_FAMILIES, measureText, textStyle } from './textMetrics.js'
 
 const TYPE_LABEL = {
+  [TOOLS.screen]: 'Tela',
   [TOOLS.rect]: 'Retângulo',
   [TOOLS.ellipse]: 'Elipse',
   [TOOLS.text]: 'Texto',
@@ -246,12 +248,101 @@ function TextFormatSection({ element, update }) {
   )
 }
 
-export default function PropertiesPanel({ element, onUpdate, onDelete }) {
+function ConnectionSection({ connection, elements, onUpdate, onDelete }) {
+  const nomeDe = (id) => {
+    const alvo = elements.find((element) => element.id === id)
+    if (!alvo) return 'removido'
+    if (isScreen(alvo)) return alvo.name
+    if (alvo.type === TOOLS.text) return `Texto "${String(alvo.text).split('\n')[0].slice(0, 18)}"`
+    return TYPE_LABEL[alvo.type] || alvo.type
+  }
+
+  const update = (patch) => onUpdate(connection.id, patch)
+
+  return (
+    <aside className="properties-panel">
+      <h2>Propriedades</h2>
+      <p className="properties-type">Ligação</p>
+
+      <section className="prop-section">
+        <h3>Percurso</h3>
+        <p className="prop-hint">
+          De <strong>{nomeDe(connection.from)}</strong> para <strong>{nomeDe(connection.to)}</strong>.
+        </p>
+      </section>
+
+      <section className="prop-section">
+        <h3>Interação</h3>
+
+        <label className="prop-field">
+          <span>Gatilho</span>
+          <select className="prop-select" value={connection.trigger} disabled>
+            <option value="click">Ao clicar</option>
+          </select>
+        </label>
+
+        <label className="prop-field">
+          <span>Transição</span>
+          <select
+            className="prop-select"
+            value={connection.transition}
+            onChange={(event) => update({ transition: event.target.value })}
+          >
+            {TRANSITIONS.map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        {connection.transition !== 'instant' && (
+          <NumberField
+            label="Duração (ms)"
+            value={connection.duration}
+            min={0}
+            step={50}
+            onChange={(duration) => update({ duration })}
+          />
+        )}
+      </section>
+
+      <button className="danger-button" type="button" onClick={() => onDelete(connection.id)}>
+        Excluir ligação
+      </button>
+    </aside>
+  )
+}
+
+export default function PropertiesPanel({
+  element,
+  connection,
+  elements = [],
+  isStartScreen,
+  onUpdate,
+  onDelete,
+  onUpdateConnection,
+  onDeleteConnection,
+  onSetStartScreen,
+}) {
+  if (connection) {
+    return (
+      <ConnectionSection
+        connection={connection}
+        elements={elements}
+        onUpdate={onUpdateConnection}
+        onDelete={onDeleteConnection}
+      />
+    )
+  }
+
   if (!element) {
     return (
       <aside className="properties-panel">
         <h2>Propriedades</h2>
-        <p className="properties-empty">Selecione um elemento no mapa para editar suas propriedades.</p>
+        <p className="properties-empty">
+          Selecione um elemento ou uma ligação no mapa para editar suas propriedades.
+        </p>
       </aside>
     )
   }
@@ -263,6 +354,33 @@ export default function PropertiesPanel({ element, onUpdate, onDelete }) {
       <h2>Propriedades</h2>
       <p className="properties-type">{TYPE_LABEL[element.type]}</p>
 
+      {isScreen(element) && (
+        <section className="prop-section">
+          <h3>Tela</h3>
+          <label className="prop-field">
+            <span>Nome</span>
+            <input
+              type="text"
+              maxLength={60}
+              value={element.name}
+              onChange={(event) => update({ name: event.target.value })}
+            />
+          </label>
+
+          {isStartScreen ? (
+            <p className="prop-hint">▶ É a tela inicial da simulação.</p>
+          ) : (
+            <button
+              className="text-button prop-reset"
+              type="button"
+              onClick={() => onSetStartScreen(element.id)}
+            >
+              Definir como tela inicial
+            </button>
+          )}
+        </section>
+      )}
+
       <section className="prop-section">
         <h3>Posição</h3>
         <div className="prop-row">
@@ -271,14 +389,14 @@ export default function PropertiesPanel({ element, onUpdate, onDelete }) {
         </div>
       </section>
 
-      {isShape(element) && (
+      {hasBox(element) && (
         <section className="prop-section">
           <h3>Dimensões</h3>
           <div className="prop-row">
             <NumberField label="Largura" value={element.width} min={1} onChange={(width) => update({ width })} />
             <NumberField label="Altura" value={element.height} min={1} onChange={(height) => update({ height })} />
           </div>
-          {element.type === TOOLS.rect && (
+          {(element.type === TOOLS.rect || isScreen(element)) && (
             <NumberField
               label="Raio da borda"
               value={element.radius}
@@ -299,7 +417,7 @@ export default function PropertiesPanel({ element, onUpdate, onDelete }) {
           onChange={(fill) => update({ fill })}
         />
 
-        {isShape(element) && (
+        {hasBox(element) && (
           <>
             <ColorField label="Borda" value={element.stroke} onChange={(stroke) => update({ stroke })} />
             <NumberField

@@ -4,15 +4,19 @@ import { apiRequest } from '../api.js'
 import CanvasStage from '../canvas/CanvasStage.jsx'
 import CanvasToolbar from '../canvas/CanvasToolbar.jsx'
 import PropertiesPanel from '../canvas/PropertiesPanel.jsx'
-import { TOOLS } from '../canvas/elements.js'
+import PrototypePlayer from '../canvas/PrototypePlayer.jsx'
+import { TOOLS, isScreen, screensOf } from '../canvas/elements.js'
+import { createConnection, pruneConnections } from '../canvas/connections.js'
 
 const AUTOSAVE_MS = 10000
 
 const TOOL_SHORTCUTS = {
   v: TOOLS.select,
+  f: TOOLS.screen,
   r: TOOLS.rect,
   e: TOOLS.ellipse,
   t: TOOLS.text,
+  c: TOOLS.connect,
 }
 
 export default function CanvasPage() {
@@ -23,8 +27,14 @@ export default function CanvasPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
 
+  const [connections, setConnections] = useState([])
+  const [startScreenId, setStartScreenId] = useState(null)
+
   const [tool, setTool] = useState(TOOLS.select)
   const [selectedId, setSelectedId] = useState(null)
+  const [selectedConnectionId, setSelectedConnectionId] = useState(null)
+  const [pendingFrom, setPendingFrom] = useState(null)
+  const [isPlaying, setIsPlaying] = useState(false)
   const [view, setView] = useState({ x: 240, y: 160, zoom: 1 })
   const [coords, setCoords] = useState({ x: 0, y: 0 })
 
@@ -34,11 +44,21 @@ export default function CanvasPage() {
   const [savedAt, setSavedAt] = useState(null)
 
   const elementsRef = useRef(elements)
+  const connectionsRef = useRef(connections)
+  const startScreenRef = useRef(startScreenId)
   const dirtyRef = useRef(false)
 
   useEffect(() => {
     elementsRef.current = elements
   }, [elements])
+
+  useEffect(() => {
+    connectionsRef.current = connections
+  }, [connections])
+
+  useEffect(() => {
+    startScreenRef.current = startScreenId
+  }, [startScreenId])
 
   useEffect(() => {
     dirtyRef.current = isDirty
@@ -47,8 +67,12 @@ export default function CanvasPage() {
   useEffect(() => {
     apiRequest(`/api/projects/${id}`)
       .then((data) => {
+        const conteudo = data.project.conteudo || {}
         setProject(data.project)
-        setElements(data.project.conteudo?.elements || [])
+        setElements(conteudo.elements || [])
+        // Documentos da versão 1 não têm ligações; o editor segue funcionando com eles.
+        setConnections(conteudo.connections || [])
+        setStartScreenId(conteudo.startScreen || null)
       })
       .catch((requestError) => setError(requestError.message))
       .finally(() => setIsLoading(false))
@@ -60,7 +84,14 @@ export default function CanvasPage() {
       await apiRequest(`/api/projects/${id}/conteudo`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ conteudo: { version: 1, elements: elementsRef.current } }),
+        body: JSON.stringify({
+          conteudo: {
+            version: 2,
+            elements: elementsRef.current,
+            connections: connectionsRef.current,
+            startScreen: startScreenRef.current,
+          },
+        }),
       })
       setIsDirty(false)
       setSavedAt(new Date())
@@ -121,16 +152,111 @@ export default function CanvasPage() {
     setIsDirty(true)
   }, [])
 
+  const updateElements = useCallback((patches) => {
+    setElements((current) =>
+      current.map((element) => (patches[element.id] ? { ...element, ...patches[element.id] } : element)),
+    )
+    setIsDirty(true)
+  }, [])
+
   const createElement = useCallback((element) => {
-    setElements((current) => [...current, element])
+    setElements((current) => {
+      // Telas nascem numeradas para ficarem distinguíveis no mapa e nas ligações.
+      if (isScreen(element)) {
+        element = { ...element, name: `Tela ${screensOf(current).length + 1}` }
+      }
+      return [...current, element]
+    })
+    // A primeira tela criada vira o ponto de partida da simulação.
+    if (isScreen(element)) setStartScreenId((current) => current || element.id)
     setSelectedId(element.id)
+    setSelectedConnectionId(null)
     setTool(TOOLS.select)
     setIsDirty(true)
   }, [])
 
   const deleteElement = useCallback((elementId) => {
-    setElements((current) => current.filter((element) => element.id !== elementId))
+    setElements((current) => {
+      const restantes = current.filter((element) => element.id !== elementId)
+      // RN-12: ligação só existe entre elementos existentes.
+      setConnections((atuais) => pruneConnections(atuais, restantes))
+      return restantes
+    })
     setSelectedId((current) => (current === elementId ? null : current))
+    setStartScreenId((current) => (current === elementId ? null : current))
+    setIsDirty(true)
+  }, [])
+
+  const updateConnection = useCallback((connectionId, patch) => {
+    setConnections((current) =>
+      current.map((connection) =>
+        connection.id === connectionId ? { ...connection, ...patch } : connection,
+      ),
+    )
+    setIsDirty(true)
+  }, [])
+
+  const deleteConnection = useCallback((connectionId) => {
+    setConnections((current) => current.filter((connection) => connection.id !== connectionId))
+    setSelectedConnectionId((current) => (current === connectionId ? null : current))
+    setIsDirty(true)
+  }, [])
+
+  const selectElement = useCallback((elementId) => {
+    setSelectedId(elementId)
+    setSelectedConnectionId(null)
+  }, [])
+
+  const selectConnection = useCallback((connectionId) => {
+    setSelectedConnectionId(connectionId)
+    setSelectedId(null)
+  }, [])
+
+  /** Ferramenta de ligação: 1º clique escolhe a origem, 2º o destino (que precisa ser uma tela). */
+  const handleConnectPick = useCallback(
+    (elementId) => {
+      if (!elementId) {
+        setPendingFrom(null)
+        return
+      }
+
+      if (!pendingFrom) {
+        setPendingFrom(elementId)
+        setError('')
+        return
+      }
+
+      if (elementId === pendingFrom) {
+        setPendingFrom(null)
+        return
+      }
+
+      const alvo = elementsRef.current.find((element) => element.id === elementId)
+      if (!alvo || !isScreen(alvo)) {
+        setError('A ligação precisa terminar em uma tela. Selecione uma tela como destino.')
+        return
+      }
+
+      const jaExiste = connectionsRef.current.some(
+        (connection) => connection.from === pendingFrom && connection.to === elementId,
+      )
+      if (!jaExiste) {
+        const nova = createConnection(pendingFrom, elementId)
+        setConnections((current) => [...current, nova])
+        setSelectedConnectionId(nova.id)
+        setSelectedId(null)
+        setIsDirty(true)
+      }
+
+      setPendingFrom(null)
+      setError('')
+      setTool(TOOLS.select)
+    },
+    [pendingFrom],
+  )
+
+  const setStartScreen = useCallback((screenId) => {
+    setStartScreenId(screenId)
     setIsDirty(true)
   }, [])
 
@@ -139,10 +265,23 @@ export default function CanvasPage() {
       const tag = event.target.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA') return
 
-      if ((event.key === 'Delete' || event.key === 'Backspace') && selectedId) {
-        event.preventDefault()
-        deleteElement(selectedId)
+      if (event.key === 'Escape') {
+        setPendingFrom(null)
+        setTool(TOOLS.select)
         return
+      }
+
+      if (event.key === 'Delete' || event.key === 'Backspace') {
+        if (selectedConnectionId) {
+          event.preventDefault()
+          deleteConnection(selectedConnectionId)
+          return
+        }
+        if (selectedId) {
+          event.preventDefault()
+          deleteElement(selectedId)
+          return
+        }
       }
 
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
@@ -152,14 +291,19 @@ export default function CanvasPage() {
       }
 
       const shortcut = TOOL_SHORTCUTS[event.key.toLowerCase()]
-      if (shortcut) setTool(shortcut)
+      if (shortcut) {
+        setTool(shortcut)
+        setPendingFrom(null)
+      }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedId, deleteElement, save])
+  }, [selectedId, selectedConnectionId, deleteElement, deleteConnection, save])
 
   const selected = elements.find((element) => element.id === selectedId) || null
+  const selectedConnection = connections.find((item) => item.id === selectedConnectionId) || null
+  const temTelas = elements.some(isScreen)
 
   function saveLabel() {
     if (isSaving) return 'Salvando...'
@@ -205,6 +349,16 @@ export default function CanvasPage() {
         <button
           className="text-button canvas-publish"
           type="button"
+          onClick={() => setIsPlaying(true)}
+          disabled={!temTelas}
+          title={temTelas ? 'Simular a navegação do protótipo' : 'Crie uma tela para poder simular'}
+        >
+          ▶ Simular
+        </button>
+
+        <button
+          className="text-button canvas-publish"
+          type="button"
           onClick={toggleStatus}
           disabled={isPublishing}
           title={
@@ -231,17 +385,32 @@ export default function CanvasPage() {
         <div className="canvas-viewport">
           <CanvasStage
             elements={elements}
+            connections={connections}
             selectedId={selectedId}
+            selectedConnectionId={selectedConnectionId}
+            startScreenId={startScreenId}
             tool={tool}
             view={view}
+            pendingFrom={pendingFrom}
             onViewChange={setView}
-            onSelect={setSelectedId}
+            onSelect={selectElement}
+            onSelectConnection={selectConnection}
             onCreate={createElement}
             onUpdate={updateElement}
+            onUpdateMany={updateElements}
+            onConnectPick={handleConnectPick}
             onPointerCoords={setCoords}
           />
 
           <CanvasToolbar tool={tool} onToolChange={setTool} />
+
+          {tool === TOOLS.connect && (
+            <p className="canvas-hint">
+              {pendingFrom
+                ? 'Agora clique na tela de destino.'
+                : 'Clique no elemento de origem (um botão, forma ou tela).'}
+            </p>
+          )}
 
           <div className="canvas-status">
             <span>
@@ -270,8 +439,27 @@ export default function CanvasPage() {
           </div>
         </div>
 
-        <PropertiesPanel element={selected} onUpdate={updateElement} onDelete={deleteElement} />
+        <PropertiesPanel
+          element={selected}
+          connection={selectedConnection}
+          elements={elements}
+          isStartScreen={selected?.id === startScreenId}
+          onUpdate={updateElement}
+          onDelete={deleteElement}
+          onUpdateConnection={updateConnection}
+          onDeleteConnection={deleteConnection}
+          onSetStartScreen={setStartScreen}
+        />
       </div>
+
+      {isPlaying && (
+        <PrototypePlayer
+          elements={elements}
+          connections={connections}
+          startScreenId={startScreenId}
+          onClose={() => setIsPlaying(false)}
+        />
+      )}
     </div>
   )
 }

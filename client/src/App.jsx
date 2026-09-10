@@ -4,6 +4,8 @@ import RequireAuth from './routes/RequireAuth.jsx'
 import HomePage from './pages/HomePage.jsx'
 import EditorPage from './pages/EditorPage.jsx'
 import CanvasPage from './pages/CanvasPage.jsx'
+import ProjectDetailPage from './pages/ProjectDetailPage.jsx'
+import ProjectReaderPage from './pages/ProjectReaderPage.jsx'
 import AccountPage from './pages/AccountPage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import RegisterPage from './pages/RegisterPage.jsx'
@@ -19,6 +21,8 @@ export default function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="editor" element={<EditorPage />} />
         <Route path="editor/:id" element={<CanvasPage />} />
+        <Route path="projeto/:id" element={<ProjectDetailPage />} />
+        <Route path="projeto/:id/ler" element={<ProjectReaderPage />} />
         <Route path="conta" element={<AccountPage />} />
       </Route>
 

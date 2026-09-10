@@ -438,6 +438,17 @@ a:hover {
 .project-card {
   display: grid;
   gap: 8px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.project-card:hover .project-cover {
+  transform: translateY(-3px);
+  border-color: var(--border-strong);
+}
+
+.project-card:hover .project-title {
+  color: #fff;
 }
 
 .project-cover {
@@ -445,6 +456,7 @@ a:hover {
   border-radius: 10px;
   border: 1px solid var(--border-color);
   background: linear-gradient(160deg, #4a4551, #26232b) center / cover no-repeat;
+  transition: transform 0.18s, border-color 0.18s;
 }
 
 .project-title {
@@ -649,6 +661,89 @@ a:hover {
   color: #b6e0c2;
 }
 
+/* Tela de apresentação do projeto (leitor) */
+.detail-page {
+  min-height: 100vh;
+  padding: 28px clamp(20px, 5vw, 56px) 60px;
+  background: radial-gradient(circle at 50% 0%, #29252e 0%, var(--bg-page) 60%);
+}
+
+.detail-header {
+  margin-bottom: 28px;
+}
+
+.detail-back {
+  position: static;
+  padding: 0;
+  text-decoration: none;
+}
+
+.detail-card {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 28px;
+  max-width: 760px;
+  padding: 28px;
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  background: var(--bg-panel);
+}
+
+.detail-cover {
+  flex-shrink: 0;
+  width: 190px;
+  aspect-ratio: 3 / 4;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  background: linear-gradient(160deg, #4a4551, #26232b) center / cover no-repeat;
+}
+
+.detail-info {
+  flex: 1;
+  min-width: 220px;
+}
+
+.detail-info h1 {
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+.detail-author {
+  margin: 6px 0 0;
+  color: var(--text-secondary);
+  font-size: 0.84rem;
+}
+
+.detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.detail-date {
+  color: var(--text-secondary);
+  font-size: 0.74rem;
+}
+
+.detail-synopsis {
+  margin: 0 0 22px;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+
+.detail-read {
+  padding: 0 34px;
+}
+
+.detail-hint {
+  margin: 10px 0 0;
+  color: var(--text-secondary);
+  font-size: 0.74rem;
+}
+
 /* Canvas / editor de projeto */
 .canvas-page {
   display: flex;
@@ -767,6 +862,189 @@ a:hover {
   font-size: 1.15rem;
   font-weight: 600;
 }
+
+.canvas-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 82px;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 6px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  background: var(--bg-panel);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+/* Simulador de protótipo */
+.player-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  background: #131215;
+}
+
+.player-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px clamp(16px, 3vw, 28px);
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-panel);
+}
+
+.player-title {
+  margin-right: auto;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.player-actions {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.player-actions .text-button {
+  margin-top: 0;
+}
+
+.player-actions .text-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.player-viewport {
+  position: relative;
+  flex: 1;
+  display: grid;
+  place-items: center;
+  min-height: 0;
+  padding: 24px;
+}
+
+.player-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border-color);
+  border-radius: 50%;
+  background: var(--bg-panel);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 1.6rem;
+  line-height: 1;
+  transition: background 0.18s, color 0.18s;
+}
+
+.player-arrow--prev {
+  left: clamp(12px, 4vw, 48px);
+}
+
+.player-arrow--next {
+  right: clamp(12px, 4vw, 48px);
+}
+
+.player-arrow:hover:not(:disabled) {
+  background: var(--bg-input);
+  color: #fff;
+}
+
+.player-arrow:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.player-stage {
+  position: relative;
+  max-width: 100%;
+  max-height: 100%;
+  height: 100%;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  box-shadow: 0 24px 60px rgb(0 0 0 / 45%);
+}
+
+.player-layer {
+  position: absolute;
+  inset: 0;
+}
+
+.player-screen {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.player-hotspot {
+  cursor: pointer;
+}
+
+/* Transições entre telas */
+@keyframes player-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes player-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes player-from-right {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+@keyframes player-from-left {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+@keyframes player-from-bottom {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+@keyframes player-from-top {
+  from { transform: translateY(-100%); }
+  to { transform: translateY(0); }
+}
+@keyframes player-to-left {
+  from { transform: translateX(0); }
+  to { transform: translateX(-100%); }
+}
+@keyframes player-to-right {
+  from { transform: translateX(0); }
+  to { transform: translateX(100%); }
+}
+@keyframes player-to-top {
+  from { transform: translateY(0); }
+  to { transform: translateY(-100%); }
+}
+@keyframes player-to-bottom {
+  from { transform: translateY(0); }
+  to { transform: translateY(100%); }
+}
+
+.player-in--dissolve { animation: player-fade-in ease both; }
+.player-out--dissolve { animation: player-fade-out ease both; }
+
+.player-in--slide-left { animation: player-from-right ease both; }
+.player-out--slide-left { animation: player-to-left ease both; }
+
+.player-in--slide-right { animation: player-from-left ease both; }
+.player-out--slide-right { animation: player-to-right ease both; }
+
+.player-in--slide-up { animation: player-from-bottom ease both; }
+.player-out--slide-up { animation: player-to-top ease both; }
+
+.player-in--slide-down { animation: player-from-top ease both; }
+.player-out--slide-down { animation: player-to-bottom ease both; }
 
 .canvas-status {
   position: absolute;

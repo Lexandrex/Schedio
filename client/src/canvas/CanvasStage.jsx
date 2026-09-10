@@ -1,26 +1,45 @@
 import { useEffect, useRef, useState } from 'react'
-import { TOOLS, createShape, createText, isShape, normalizeRect } from './elements.js'
-import { measureText, textStyle } from './textMetrics.js'
+import {
+  TOOLS,
+  boxOf,
+  childrenOfScreen,
+  createScreen,
+  createShape,
+  createText,
+  isScreen,
+  normalizeRect,
+} from './elements.js'
+import { connectionAnchors } from './connections.js'
+import CanvasElement from './CanvasElement.jsx'
 
 const MIN_ZOOM = 0.15
 const MAX_ZOOM = 4
 const MIN_SIZE = 4
 const HANDLES = ['nw', 'ne', 'se', 'sw']
+const DEFAULT_SCREEN = { width: 360, height: 640 }
 
 export default function CanvasStage({
   elements,
+  connections,
   selectedId,
+  selectedConnectionId,
+  startScreenId,
   tool,
   view,
+  pendingFrom,
   onViewChange,
   onSelect,
+  onSelectConnection,
   onCreate,
   onUpdate,
+  onUpdateMany,
+  onConnectPick,
   onPointerCoords,
 }) {
   const svgRef = useRef(null)
   const dragRef = useRef(null)
   const [draft, setDraft] = useState(null)
+  const [cursorPoint, setCursorPoint] = useState(null)
 
   const selected = elements.find((element) => element.id === selectedId) || null
 
@@ -37,6 +56,7 @@ export default function CanvasStage({
     if (event.button !== 0) return
     const point = toCanvasPoint(event)
     const targetId = event.target.getAttribute?.('data-el')
+    const connectionId = event.target.getAttribute?.('data-cx')
     const handle = event.target.getAttribute?.('data-handle')
 
     try {
@@ -45,14 +65,20 @@ export default function CanvasStage({
       // Alguns navegadores recusam a captura; o arrasto segue funcionando sem ela.
     }
 
+    // Ferramenta de ligação: primeiro clique escolhe a origem, segundo o destino.
+    if (tool === TOOLS.connect) {
+      if (targetId) onConnectPick(targetId)
+      else onConnectPick(null)
+      return
+    }
+
     if (handle && selected) {
-      // A caixa medida garante largura/altura concretas mesmo em texto com tamanho automático.
-      const origin = { ...selected, ...selectionBox(selected) }
+      const origin = { ...selected, ...boxOf(selected) }
       dragRef.current = { mode: 'resize', handle, origin, start: point }
       return
     }
 
-    if (tool === TOOLS.rect || tool === TOOLS.ellipse) {
+    if (tool === TOOLS.screen || tool === TOOLS.rect || tool === TOOLS.ellipse) {
       const rect = normalizeRect(point.x, point.y, point.x, point.y)
       dragRef.current = { mode: 'create', start: point, type: tool, rect }
       setDraft({ ...rect, type: tool })
@@ -64,10 +90,21 @@ export default function CanvasStage({
       return
     }
 
+    if (connectionId) {
+      onSelectConnection(connectionId)
+      return
+    }
+
     if (targetId) {
       const element = elements.find((item) => item.id === targetId)
       onSelect(targetId)
-      dragRef.current = { mode: 'move', origin: { ...element }, start: point }
+
+      // Arrastar uma tela leva junto o que está dentro dela.
+      const carried = isScreen(element)
+        ? childrenOfScreen(elements, element).map((child) => ({ id: child.id, x: child.x, y: child.y }))
+        : []
+
+      dragRef.current = { mode: 'move', origin: { ...element }, start: point, carried }
       return
     }
 
@@ -77,8 +114,12 @@ export default function CanvasStage({
 
   function handlePointerMove(event) {
     const drag = dragRef.current
+    const point = toCanvasPoint(event)
+
+    if (tool === TOOLS.connect && pendingFrom) setCursorPoint(point)
+
     if (!drag) {
-      onPointerCoords(toCanvasPoint(event))
+      onPointerCoords(point)
       return
     }
 
@@ -91,7 +132,6 @@ export default function CanvasStage({
       return
     }
 
-    const point = toCanvasPoint(event)
     onPointerCoords(point)
 
     if (drag.mode === 'create') {
@@ -104,10 +144,16 @@ export default function CanvasStage({
     const deltaY = point.y - drag.start.y
 
     if (drag.mode === 'move') {
-      onUpdate(drag.origin.id, {
-        x: Math.round(drag.origin.x + deltaX),
-        y: Math.round(drag.origin.y + deltaY),
+      const patches = {
+        [drag.origin.id]: {
+          x: Math.round(drag.origin.x + deltaX),
+          y: Math.round(drag.origin.y + deltaY),
+        },
+      }
+      drag.carried.forEach((child) => {
+        patches[child.id] = { x: Math.round(child.x + deltaX), y: Math.round(child.y + deltaY) }
       })
+      onUpdateMany(patches)
       return
     }
 
@@ -153,12 +199,22 @@ export default function CanvasStage({
       const { rect, type } = drag
       const width = Math.max(Math.round(rect.width), 0)
       const height = Math.max(Math.round(rect.height), 0)
-      // Um clique simples (sem arrastar) cria uma forma com tamanho padrão.
-      const shape =
-        width < MIN_SIZE || height < MIN_SIZE
-          ? createShape(type, Math.round(rect.x), Math.round(rect.y), 160, 100)
-          : createShape(type, Math.round(rect.x), Math.round(rect.y), width, height)
-      onCreate(shape)
+      const tooSmall = width < MIN_SIZE || height < MIN_SIZE
+      const x = Math.round(rect.x)
+      const y = Math.round(rect.y)
+
+      if (type === TOOLS.screen) {
+        // Clique simples cria uma tela no formato de celular.
+        onCreate(
+          tooSmall
+            ? createScreen(x, y, DEFAULT_SCREEN.width, DEFAULT_SCREEN.height)
+            : createScreen(x, y, width, height),
+        )
+      } else {
+        onCreate(
+          tooSmall ? createShape(type, x, y, 160, 100) : createShape(type, x, y, width, height),
+        )
+      }
     }
 
     setDraft(null)
@@ -189,14 +245,11 @@ export default function CanvasStage({
     return () => svg.removeEventListener('wheel', handleWheel)
   }, [view, onViewChange])
 
-  function selectionBox(element) {
-    if (isShape(element)) {
-      return { x: element.x, y: element.y, width: element.width, height: element.height }
-    }
-    const metrics = measureText(element)
-    return { x: element.x, y: element.y, width: metrics.width, height: metrics.height }
-  }
-
+  const byId = new Map(elements.map((element) => [element.id, element]))
+  // Telas ficam atrás; o resto desenha por cima.
+  const screens = elements.filter(isScreen)
+  const others = elements.filter((element) => !isScreen(element))
+  const pendingElement = pendingFrom ? byId.get(pendingFrom) : null
   const cursor = tool === TOOLS.select ? 'default' : 'crosshair'
 
   return (
@@ -241,6 +294,12 @@ export default function CanvasStage({
             strokeWidth="1"
           />
         </pattern>
+        <marker id="cx-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#8f7fd4" />
+        </marker>
+        <marker id="cx-arrow-active" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#c3b5ff" />
+        </marker>
       </defs>
 
       <rect width="100%" height="100%" fill="url(#grid-block)" />
@@ -250,93 +309,89 @@ export default function CanvasStage({
       <line x1={view.x} y1="0" x2={view.x} y2="100%" stroke="#7d6f92" strokeWidth="1.5" />
 
       <g transform={`translate(${view.x} ${view.y}) scale(${view.zoom})`}>
-        {elements.map((element) => {
-          if (element.type === TOOLS.rect) {
-            return (
-              <rect
-                key={element.id}
-                data-el={element.id}
-                x={element.x}
-                y={element.y}
-                width={element.width}
-                height={element.height}
-                rx={element.radius}
-                fill={element.fill}
-                stroke={element.stroke}
-                strokeWidth={element.strokeWidth}
-                opacity={element.opacity}
-              />
-            )
-          }
+        {screens.map((screen) => (
+          <g key={screen.id}>
+            <CanvasElement element={screen} hitId={screen.id} />
+            <text
+              x={screen.x}
+              y={screen.y - 8 / view.zoom}
+              fill={screen.id === startScreenId ? '#c3b5ff' : '#b9b1c4'}
+              fontSize={12 / view.zoom}
+              pointerEvents="none"
+              style={{ userSelect: 'none' }}
+            >
+              {screen.id === startScreenId ? `▶ ${screen.name}` : screen.name}
+            </text>
+          </g>
+        ))}
 
-          if (element.type === TOOLS.ellipse) {
-            return (
-              <ellipse
-                key={element.id}
-                data-el={element.id}
-                cx={element.x + element.width / 2}
-                cy={element.y + element.height / 2}
-                rx={element.width / 2}
-                ry={element.height / 2}
-                fill={element.fill}
-                stroke={element.stroke}
-                strokeWidth={element.strokeWidth}
-                opacity={element.opacity}
-              />
-            )
-          }
+        {others.map((element) => (
+          <CanvasElement key={element.id} element={element} hitId={element.id} />
+        ))}
 
-          const style = textStyle(element)
-          const metrics = measureText(element)
-          const anchor =
-            style.textAlign === 'center' ? 'middle' : style.textAlign === 'right' ? 'end' : 'start'
-          const anchorX =
-            style.textAlign === 'center'
-              ? element.x + metrics.width / 2
-              : style.textAlign === 'right'
-                ? element.x + metrics.width
-                : element.x
+        {/* Ligações de protótipo */}
+        {connections.map((connection) => {
+          const from = byId.get(connection.from)
+          const to = byId.get(connection.to)
+          if (!from || !to) return null
 
-          const sobra = metrics.height - metrics.contentHeight
-          const offsetY =
-            style.verticalAlign === 'middle'
-              ? sobra / 2
-              : style.verticalAlign === 'bottom'
-                ? sobra
-                : 0
+          const { start, end } = connectionAnchors(boxOf(from), boxOf(to))
+          const active = connection.id === selectedConnectionId
 
           return (
-            <g key={element.id} opacity={element.opacity}>
-              {/* Área de clique do bloco inteiro, inclusive linhas vazias. */}
-              <rect
-                data-el={element.id}
-                x={element.x}
-                y={element.y}
-                width={Math.max(metrics.width, 8)}
-                height={Math.max(metrics.height, element.fontSize)}
-                fill="transparent"
+            <g key={connection.id}>
+              {/* Traço largo invisível: alvo de clique confortável na linha fina. */}
+              <line
+                data-cx={connection.id}
+                x1={start.x}
+                y1={start.y}
+                x2={end.x}
+                y2={end.y}
+                stroke="transparent"
+                strokeWidth={12 / view.zoom}
+                style={{ cursor: 'pointer' }}
               />
-              <text
-                fill={element.fill}
-                fontSize={element.fontSize}
-                fontFamily={style.fontFamily}
-                fontWeight={style.fontWeight}
-                fontStyle={style.fontStyle}
-                textDecoration={style.textDecoration}
-                textAnchor={anchor}
-                dominantBaseline="hanging"
+              <line
+                x1={start.x}
+                y1={start.y}
+                x2={end.x}
+                y2={end.y}
+                stroke={active ? '#c3b5ff' : '#8f7fd4'}
+                strokeWidth={(active ? 2.5 : 1.75) / view.zoom}
+                markerEnd={`url(#${active ? 'cx-arrow-active' : 'cx-arrow'})`}
                 pointerEvents="none"
-                style={{ userSelect: 'none' }}
-              >
-                {metrics.lines.map((line, index) => (
-                  <tspan key={index} x={anchorX} y={element.y + offsetY + index * metrics.lineHeight}>
-                    {line}
-                  </tspan>
-                ))}
-              </text>
+              />
+              <circle
+                cx={start.x}
+                cy={start.y}
+                r={3.5 / view.zoom}
+                fill={active ? '#c3b5ff' : '#8f7fd4'}
+                pointerEvents="none"
+              />
             </g>
           )
         })}
+
+        {/* Ligação em construção seguindo o cursor */}
+        {pendingElement && cursorPoint && (
+          <g pointerEvents="none">
+            <rect
+              {...boxOf(pendingElement)}
+              fill="none"
+              stroke="#c3b5ff"
+              strokeWidth={1.5 / view.zoom}
+            />
+            <line
+              x1={boxOf(pendingElement).x + boxOf(pendingElement).width / 2}
+              y1={boxOf(pendingElement).y + boxOf(pendingElement).height / 2}
+              x2={cursorPoint.x}
+              y2={cursorPoint.y}
+              stroke="#c3b5ff"
+              strokeWidth={1.5 / view.zoom}
+              strokeDasharray={`${5 / view.zoom} ${5 / view.zoom}`}
+            />
+          </g>
+        )}
 
         {draft && draft.width > 0 && draft.height > 0 && (
           <rect
@@ -353,38 +408,33 @@ export default function CanvasStage({
 
         {selected && (
           <g pointerEvents="none">
-            <rect
-              {...selectionBox(selected)}
-              fill="none"
-              stroke="#aaa1b5"
-              strokeWidth={1.5 / view.zoom}
-            />
+            <rect {...boxOf(selected)} fill="none" stroke="#aaa1b5" strokeWidth={1.5 / view.zoom} />
             {HANDLES.map((handle) => {
-                const box = selectionBox(selected)
-                const size = 8 / view.zoom
-                const positions = {
-                  nw: { x: box.x, y: box.y },
-                  ne: { x: box.x + box.width, y: box.y },
-                  se: { x: box.x + box.width, y: box.y + box.height },
-                  sw: { x: box.x, y: box.y + box.height },
-                }
-                const position = positions[handle]
-                return (
-                  <rect
-                    key={handle}
-                    data-handle={handle}
-                    x={position.x - size / 2}
-                    y={position.y - size / 2}
-                    width={size}
-                    height={size}
-                    fill="#19181a"
-                    stroke="#aaa1b5"
-                    strokeWidth={1 / view.zoom}
-                    pointerEvents="all"
-                    style={{ cursor: `${handle}-resize` }}
-                  />
-                )
-              })}
+              const box = boxOf(selected)
+              const size = 8 / view.zoom
+              const positions = {
+                nw: { x: box.x, y: box.y },
+                ne: { x: box.x + box.width, y: box.y },
+                se: { x: box.x + box.width, y: box.y + box.height },
+                sw: { x: box.x, y: box.y + box.height },
+              }
+              const position = positions[handle]
+              return (
+                <rect
+                  key={handle}
+                  data-handle={handle}
+                  x={position.x - size / 2}
+                  y={position.y - size / 2}
+                  width={size}
+                  height={size}
+                  fill="#19181a"
+                  stroke="#aaa1b5"
+                  strokeWidth={1 / view.zoom}
+                  pointerEvents="all"
+                  style={{ cursor: `${handle}-resize` }}
+                />
+              )
+            })}
           </g>
         )}
       </g>

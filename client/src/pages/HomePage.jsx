@@ -76,14 +76,14 @@ export default function HomePage() {
 
       <div className="project-grid">
         {visibleProjects.map((project) => (
-          <article className="project-card" key={project.id}>
+          <Link className="project-card" key={project.id} to={`/projeto/${project.id}`}>
             <div
               className="project-cover"
               style={project.capa ? { backgroundImage: `url(${project.capa})` } : undefined}
             />
             <h2 className="project-title">{project.titulo}</h2>
             <p className="project-author">{project.autor_nome || project.autor_email}</p>
-          </article>
+          </Link>
         ))}
       </div>
     </div>

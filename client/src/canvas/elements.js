@@ -1,15 +1,19 @@
-import { DEFAULT_FONT_FAMILY, DEFAULT_LINE_HEIGHT } from './textMetrics.js'
+import { DEFAULT_FONT_FAMILY, DEFAULT_LINE_HEIGHT, measureText } from './textMetrics.js'
 
 export const TOOLS = {
   select: 'select',
+  screen: 'screen',
   rect: 'rect',
   ellipse: 'ellipse',
   text: 'text',
+  connect: 'connect',
 }
 
 export const DEFAULT_FILL = '#6f6880'
 export const DEFAULT_STROKE = '#aaa1b5'
 export const DEFAULT_TEXT_FILL = '#f4f2f5'
+export const DEFAULT_SCREEN_FILL = '#2a2731'
+export const DEFAULT_SCREEN_STROKE = '#655d6f'
 
 let counter = 0
 
@@ -67,6 +71,73 @@ export function normalizeRect(startX, startY, endX, endY) {
   }
 }
 
+export function createScreen(x, y, width, height, name) {
+  return {
+    id: createId(),
+    type: TOOLS.screen,
+    x,
+    y,
+    width,
+    height,
+    name: name || 'Tela',
+    fill: DEFAULT_SCREEN_FILL,
+    stroke: DEFAULT_SCREEN_STROKE,
+    strokeWidth: 1,
+    radius: 4,
+    opacity: 1,
+  }
+}
+
+export function isScreen(element) {
+  return element.type === TOOLS.screen
+}
+
 export function isShape(element) {
   return element.type === TOOLS.rect || element.type === TOOLS.ellipse
+}
+
+/** Elementos com caixa explícita (x/y/width/height editáveis). */
+export function hasBox(element) {
+  return isScreen(element) || isShape(element)
+}
+
+/** Caixa de qualquer elemento — texto é medido, o resto já tem as dimensões. */
+export function boxOf(element) {
+  if (hasBox(element)) {
+    return { x: element.x, y: element.y, width: element.width, height: element.height }
+  }
+  const metrics = measureText(element)
+  return { x: element.x, y: element.y, width: metrics.width, height: metrics.height }
+}
+
+/**
+ * Um elemento pertence à tela cujo centro o contém. Usar o centro (em vez de
+ * exigir contenção total) evita que algo levemente para fora deixe de pertencer.
+ */
+export function isInsideScreen(element, screen) {
+  const box = boxOf(element)
+  const centerX = box.x + box.width / 2
+  const centerY = box.y + box.height / 2
+  return (
+    centerX >= screen.x &&
+    centerX <= screen.x + screen.width &&
+    centerY >= screen.y &&
+    centerY <= screen.y + screen.height
+  )
+}
+
+export function screensOf(elements) {
+  return elements.filter(isScreen)
+}
+
+/** Conteúdo de uma tela, na ordem de desenho. */
+export function childrenOfScreen(elements, screen) {
+  return elements.filter((element) => !isScreen(element) && isInsideScreen(element, screen))
+}
+
+/** Tela que contém o elemento, se houver (a última vence, respeitando a ordem de desenho). */
+export function screenContaining(elements, element) {
+  return screensOf(elements)
+    .filter((screen) => screen.id !== element.id && isInsideScreen(element, screen))
+    .pop() || null
 }
