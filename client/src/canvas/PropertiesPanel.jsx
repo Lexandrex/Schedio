@@ -1,4 +1,4 @@
-import { TOOLS, hasBox, isScreen } from './elements.js'
+import { TOOLS, hasBox, isImage, isScreen } from './elements.js'
 import { TRANSITIONS } from './connections.js'
 import { FONT_FAMILIES, measureText, textStyle } from './textMetrics.js'
 
@@ -7,6 +7,7 @@ const TYPE_LABEL = {
   [TOOLS.rect]: 'Retângulo',
   [TOOLS.ellipse]: 'Elipse',
   [TOOLS.text]: 'Texto',
+  [TOOLS.image]: 'Imagem',
 }
 
 function NumberField({ label, value, onChange, min, step }) {
@@ -314,11 +315,46 @@ function ConnectionSection({ connection, elements, onUpdate, onDelete }) {
   )
 }
 
+/** Sem seleção o painel vira o lugar das configurações do projeto. */
+function ProjectSection({ capa, isUploading, onChangeCapa }) {
+  return (
+    <aside className="properties-panel">
+      <h2>Propriedades</h2>
+      <p className="properties-type">Projeto</p>
+
+      <section className="prop-section">
+        <h3>Capa</h3>
+        <div
+          className="capa-preview"
+          style={capa ? { backgroundImage: `url(${capa})` } : undefined}
+          aria-label={capa ? 'Capa atual do projeto' : 'Projeto sem capa'}
+        />
+        <button
+          className="text-button prop-reset"
+          type="button"
+          onClick={onChangeCapa}
+          disabled={isUploading}
+        >
+          {isUploading ? 'Enviando...' : capa ? 'Trocar capa' : 'Enviar capa'}
+        </button>
+        <p className="prop-hint">A capa aparece na tela inicial e na apresentação para o leitor.</p>
+      </section>
+
+      <p className="properties-empty">
+        Selecione um elemento ou uma ligação no mapa para editar suas propriedades.
+      </p>
+    </aside>
+  )
+}
+
 export default function PropertiesPanel({
   element,
   connection,
   elements = [],
   isStartScreen,
+  capa,
+  isUploading,
+  onChangeCapa,
   onUpdate,
   onDelete,
   onUpdateConnection,
@@ -337,14 +373,7 @@ export default function PropertiesPanel({
   }
 
   if (!element) {
-    return (
-      <aside className="properties-panel">
-        <h2>Propriedades</h2>
-        <p className="properties-empty">
-          Selecione um elemento ou uma ligação no mapa para editar suas propriedades.
-        </p>
-      </aside>
-    )
+    return <ProjectSection capa={capa} isUploading={isUploading} onChangeCapa={onChangeCapa} />
   }
 
   const update = (patch) => onUpdate(element.id, patch)
@@ -411,13 +440,17 @@ export default function PropertiesPanel({
 
       <section className="prop-section">
         <h3>Aparência</h3>
-        <ColorField
-          label={element.type === TOOLS.text ? 'Cor do texto' : 'Preenchimento'}
-          value={element.fill}
-          onChange={(fill) => update({ fill })}
-        />
 
-        {hasBox(element) && (
+        {/* Imagem não tem preenchimento nem borda: o conteúdo é o próprio arquivo. */}
+        {!isImage(element) && (
+          <ColorField
+            label={element.type === TOOLS.text ? 'Cor do texto' : 'Preenchimento'}
+            value={element.fill}
+            onChange={(fill) => update({ fill })}
+          />
+        )}
+
+        {hasBox(element) && !isImage(element) && (
           <>
             <ColorField label="Borda" value={element.stroke} onChange={(stroke) => update({ stroke })} />
             <NumberField

@@ -6,8 +6,47 @@ const path = require('path');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
+const multer = require('multer');
 const { query } = require('./db');
 const { signToken, requireAuth } = require('./auth');
+const storage = require('./storage');
+
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+
+// Arquivo fica em memória e segue direto para o Cloudinary — nada é gravado em disco.
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_IMAGE_BYTES },
+  fileFilter: (_request, file, done) => {
+    if (!file.mimetype?.startsWith('image/')) {
+      return done(new Error('TIPO_INVALIDO'));
+    }
+    return done(null, true);
+  },
+});
+
+/** Envolve o multer para transformar os erros dele em respostas JSON do app. */
+function receberImagem(request, response, next) {
+  upload.single('imagem')(request, response, (error) => {
+    if (!error) return next();
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      return response.status(413).json({ message: 'A imagem deve ter no máximo 5 MB.' });
+    }
+    if (error.message === 'TIPO_INVALIDO') {
+      return response.status(415).json({ message: 'Envie um arquivo de imagem.' });
+    }
+    return next(error);
+  });
+}
+
+/** Só o dono mexe nas imagens do projeto. */
+async function projetoDoUsuario(projetoId, userId) {
+  const result = await query(
+    'SELECT id, capa, capa_public_id FROM projetos WHERE id = $1 AND usuario_id = $2',
+    [projetoId, userId],
+  );
+  return result.rows[0] || null;
+}
 
 const app = express();
 
@@ -95,6 +134,7 @@ app.get('/api/health', async (_request, response, next) => {
       status: 'ok',
       database: 'connected',
       smtp: smtpStatus,
+      storage: storage.storageStatus(),
     });
   } catch (error) { next(error); }
 });
@@ -388,8 +428,125 @@ app.put('/api/projects/:id/conteudo', requireAuth, async (request, response, nex
   }
 });
 
+/** Barra as rotas de imagem antes de qualquer trabalho quando falta credencial. */
+function requireStorage(_request, response, next) {
+  if (!storage.isConfigured) {
+    return response.status(503).json({
+      message:
+        'O armazenamento de imagens ainda não está configurado. Defina CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY e CLOUDINARY_API_SECRET no .env.',
+    });
+  }
+  return next();
+}
+
+app.get('/api/projects/:id/imagens', requireAuth, async (request, response, next) => {
+  try {
+    const projeto = await projetoDoUsuario(request.params.id, request.userId);
+    if (!projeto) return response.status(404).json({ message: 'Projeto não encontrado.' });
+
+    const result = await query(
+      'SELECT id, url, public_id FROM imagens WHERE projeto_id = $1 ORDER BY id',
+      [request.params.id],
+    );
+    return response.json({ images: result.rows });
+  } catch (error) {
+    if (error.code === '22P02') return response.status(404).json({ message: 'Projeto não encontrado.' });
+    return next(error);
+  }
+});
+
+app.post(
+  '/api/projects/:id/imagens',
+  requireAuth,
+  requireStorage,
+  receberImagem,
+  async (request, response, next) => {
+    try {
+      if (!request.file) return response.status(400).json({ message: 'Nenhuma imagem enviada.' });
+
+      const projeto = await projetoDoUsuario(request.params.id, request.userId);
+      if (!projeto) return response.status(404).json({ message: 'Projeto não encontrado.' });
+
+      const enviada = await storage.uploadBuffer(request.file.buffer);
+      const result = await query(
+        'INSERT INTO imagens (projeto_id, url, public_id) VALUES ($1, $2, $3) RETURNING id, url, public_id',
+        [request.params.id, enviada.url, enviada.publicId],
+      );
+      return response.status(201).json({ image: result.rows[0] });
+    } catch (error) {
+      if (error.code === '22P02') return response.status(404).json({ message: 'Projeto não encontrado.' });
+      return next(error);
+    }
+  },
+);
+
+app.delete('/api/imagens/:id', requireAuth, requireStorage, async (request, response, next) => {
+  try {
+    const result = await query(
+      `SELECT i.id, i.public_id FROM imagens i
+       JOIN projetos p ON p.id = i.projeto_id
+       WHERE i.id = $1 AND p.usuario_id = $2`,
+      [request.params.id, request.userId],
+    );
+    const imagem = result.rows[0];
+    if (!imagem) return response.status(404).json({ message: 'Imagem não encontrada.' });
+
+    await storage.destroyImage(imagem.public_id);
+    await query('DELETE FROM imagens WHERE id = $1', [imagem.id]);
+    return response.status(204).send();
+  } catch (error) {
+    if (error.code === '22P02') return response.status(404).json({ message: 'Imagem não encontrada.' });
+    return next(error);
+  }
+});
+
+app.post(
+  '/api/projects/:id/capa',
+  requireAuth,
+  requireStorage,
+  receberImagem,
+  async (request, response, next) => {
+    try {
+      if (!request.file) return response.status(400).json({ message: 'Nenhuma imagem enviada.' });
+
+      const projeto = await projetoDoUsuario(request.params.id, request.userId);
+      if (!projeto) return response.status(404).json({ message: 'Projeto não encontrado.' });
+
+      const capaAnterior = projeto.capa_public_id;
+
+      const enviada = await storage.uploadBuffer(request.file.buffer, {
+        folder: `${storage.FOLDER}/capas`,
+      });
+      const result = await query(
+        'UPDATE projetos SET capa = $1, capa_public_id = $2 WHERE id = $3 RETURNING capa',
+        [enviada.url, enviada.publicId, request.params.id],
+      );
+
+      // A capa substituída viraria lixo no Cloudinary; removida depois do update dar certo.
+      if (capaAnterior) {
+        await storage.destroyImage(capaAnterior).catch(() => {})
+      }
+
+      return response.json({ capa: result.rows[0].capa });
+    } catch (error) {
+      if (error.code === '22P02') return response.status(404).json({ message: 'Projeto não encontrado.' });
+      return next(error);
+    }
+  },
+);
+
 app.delete('/api/projects/:id', requireAuth, async (request, response, next) => {
   try {
+    // Os arquivos precisam ser coletados antes: o DELETE leva junto as linhas de `imagens`.
+    const aRemover = await query(
+      `SELECT p.capa_public_id, ARRAY_REMOVE(ARRAY_AGG(i.public_id), NULL) AS imagens
+       FROM projetos p
+       LEFT JOIN imagens i ON i.projeto_id = p.id
+       WHERE p.id = $1 AND p.usuario_id = $2
+       GROUP BY p.capa_public_id`,
+      [request.params.id, request.userId],
+    );
+
     const result = await query(
       'DELETE FROM projetos WHERE id = $1 AND usuario_id = $2',
       [request.params.id, request.userId],
@@ -397,6 +554,14 @@ app.delete('/api/projects/:id', requireAuth, async (request, response, next) => 
     if (!result.rowCount) {
       return response.status(404).json({ message: 'Projeto não encontrado.' });
     }
+
+    // Best-effort: o projeto já foi excluído, uma falha aqui não deve virar erro para o usuário.
+    if (storage.isConfigured && aRemover.rows[0]) {
+      const { capa_public_id: capa, imagens } = aRemover.rows[0];
+      const ids = [...(imagens || []), ...(capa ? [capa] : [])];
+      await Promise.all(ids.map((publicId) => storage.destroyImage(publicId).catch(() => {})));
+    }
+
     return response.status(204).send();
   } catch (error) {
     if (error.code === '22P02') return response.status(404).json({ message: 'Projeto não encontrado.' });

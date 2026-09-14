@@ -6,6 +6,7 @@ export const TOOLS = {
   rect: 'rect',
   ellipse: 'ellipse',
   text: 'text',
+  image: 'image',
   connect: 'connect',
 }
 
@@ -88,8 +89,30 @@ export function createScreen(x, y, width, height, name) {
   }
 }
 
+/**
+ * `imageId` aponta para a linha em `imagens`, guardada para que o arquivo no
+ * Cloudinary possa ser rastreado; `src` é a URL pública já otimizada.
+ */
+export function createImage(x, y, width, height, src, imageId) {
+  return {
+    id: createId(),
+    type: TOOLS.image,
+    x,
+    y,
+    width,
+    height,
+    src,
+    imageId,
+    opacity: 1,
+  }
+}
+
 export function isScreen(element) {
   return element.type === TOOLS.screen
+}
+
+export function isImage(element) {
+  return element.type === TOOLS.image
 }
 
 export function isShape(element) {
@@ -98,7 +121,7 @@ export function isShape(element) {
 
 /** Elementos com caixa explícita (x/y/width/height editáveis). */
 export function hasBox(element) {
-  return isScreen(element) || isShape(element)
+  return isScreen(element) || isShape(element) || isImage(element)
 }
 
 /** Caixa de qualquer elemento — texto é medido, o resto já tem as dimensões. */

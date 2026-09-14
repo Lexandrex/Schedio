@@ -9,14 +9,17 @@
     "db:migrate": "node scripts/migrate.js",
     "db:verify": "node scripts/verify-migration.js",
     "auth:inspect": "node scripts/inspect-auth-status.js",
-    "smtp:inspect": "node scripts/inspect-smtp-config.js"
+    "smtp:inspect": "node scripts/inspect-smtp-config.js",
+    "storage:inspect": "node scripts/inspect-storage-config.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
+    "cloudinary": "^2.11.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "jsonwebtoken": "^9.0.3",
+    "multer": "^2.4.0",
     "nodemailer": "^6.9.5",
     "pg": "^8.13.3"
   }

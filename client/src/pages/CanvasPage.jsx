@@ -5,7 +5,7 @@ import CanvasStage from '../canvas/CanvasStage.jsx'
 import CanvasToolbar from '../canvas/CanvasToolbar.jsx'
 import PropertiesPanel from '../canvas/PropertiesPanel.jsx'
 import PrototypePlayer from '../canvas/PrototypePlayer.jsx'
-import { TOOLS, isScreen, screensOf } from '../canvas/elements.js'
+import { TOOLS, createImage, isScreen, screensOf } from '../canvas/elements.js'
 import { createConnection, pruneConnections } from '../canvas/connections.js'
 
 const AUTOSAVE_MS = 10000
@@ -35,6 +35,9 @@ export default function CanvasPage() {
   const [selectedConnectionId, setSelectedConnectionId] = useState(null)
   const [pendingFrom, setPendingFrom] = useState(null)
   const [isPlaying, setIsPlaying] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
+  const imagemInputRef = useRef(null)
+  const capaInputRef = useRef(null)
   const [view, setView] = useState({ x: 240, y: 160, zoom: 1 })
   const [coords, setCoords] = useState({ x: 0, y: 0 })
 
@@ -260,6 +263,75 @@ export default function CanvasPage() {
     setIsDirty(true)
   }, [])
 
+  /** Lê as dimensões reais do arquivo para a imagem entrar no canvas sem distorcer. */
+  async function medirImagem(file) {
+    try {
+      const bitmap = await createImageBitmap(file)
+      const escala = Math.min(1, 400 / bitmap.width)
+      return { width: Math.round(bitmap.width * escala), height: Math.round(bitmap.height * escala) }
+    } catch {
+      return { width: 300, height: 200 }
+    }
+  }
+
+  async function handleImageFile(event) {
+    const file = event.target.files?.[0]
+    event.target.value = '' // permite reenviar o mesmo arquivo depois
+    if (!file) return
+
+    setIsUploading(true)
+    setError('')
+
+    try {
+      const { width, height } = await medirImagem(file)
+      const form = new FormData()
+      form.append('imagem', file)
+
+      // Sem Content-Type manual: o browser precisa definir o boundary do multipart.
+      const data = await apiRequest(`/api/projects/${id}/imagens`, { method: 'POST', body: form })
+
+      // Posiciona no centro do que está visível no momento.
+      const viewport = document.querySelector('.canvas-viewport')
+      const centroX = ((viewport?.clientWidth || 800) / 2 - view.x) / view.zoom
+      const centroY = ((viewport?.clientHeight || 600) / 2 - view.y) / view.zoom
+
+      createElement(
+        createImage(
+          Math.round(centroX - width / 2),
+          Math.round(centroY - height / 2),
+          width,
+          height,
+          data.image.url,
+          data.image.id,
+        ),
+      )
+    } catch (requestError) {
+      setError(requestError.message)
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
+  async function handleCapaFile(event) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+
+    setIsUploading(true)
+    setError('')
+
+    try {
+      const form = new FormData()
+      form.append('imagem', file)
+      const data = await apiRequest(`/api/projects/${id}/capa`, { method: 'POST', body: form })
+      setProject((current) => ({ ...current, capa: data.capa }))
+    } catch (requestError) {
+      setError(requestError.message)
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
   useEffect(() => {
     function handleKeyDown(event) {
       const tag = event.target.tagName
@@ -402,7 +474,21 @@ export default function CanvasPage() {
             onPointerCoords={setCoords}
           />
 
-          <CanvasToolbar tool={tool} onToolChange={setTool} />
+          <CanvasToolbar
+            tool={tool}
+            onToolChange={setTool}
+            onAddImage={() => imagemInputRef.current?.click()}
+            isUploading={isUploading}
+          />
+
+          <input
+            ref={imagemInputRef}
+            type="file"
+            accept="image/*"
+            hidden
+            onChange={handleImageFile}
+          />
+          <input ref={capaInputRef} type="file" accept="image/*" hidden onChange={handleCapaFile} />
 
           {tool === TOOLS.connect && (
             <p className="canvas-hint">
@@ -444,6 +530,9 @@ export default function CanvasPage() {
           connection={selectedConnection}
           elements={elements}
           isStartScreen={selected?.id === startScreenId}
+          capa={project.capa}
+          isUploading={isUploading}
+          onChangeCapa={() => capaInputRef.current?.click()}
           onUpdate={updateElement}
           onDelete={deleteElement}
           onUpdateConnection={updateConnection}

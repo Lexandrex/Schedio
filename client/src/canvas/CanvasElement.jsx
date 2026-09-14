@@ -27,6 +27,32 @@ export default function CanvasElement({ element, hitId = null, hitClassName }) {
     )
   }
 
+  if (element.type === TOOLS.image) {
+    return (
+      <g opacity={element.opacity}>
+        <image
+          href={element.src}
+          x={element.x}
+          y={element.y}
+          width={element.width}
+          height={element.height}
+          preserveAspectRatio="xMidYMid slice"
+          pointerEvents="none"
+        />
+        {/* Área de clique própria: <image> com href quebrado não recebe eventos. */}
+        <rect
+          data-el={hitId || undefined}
+          className={hitClassName}
+          x={element.x}
+          y={element.y}
+          width={element.width}
+          height={element.height}
+          fill="transparent"
+        />
+      </g>
+    )
+  }
+
   if (element.type === TOOLS.rect) {
     return (
       <rect

@@ -1146,6 +1146,16 @@ a:hover {
   min-height: 64px;
 }
 
+.capa-preview {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  max-height: 180px;
+  margin-bottom: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: linear-gradient(160deg, #4a4551, #26232b) center / cover no-repeat;
+}
+
 .prop-hint {
   margin: 0 0 8px;
   color: var(--text-secondary);
