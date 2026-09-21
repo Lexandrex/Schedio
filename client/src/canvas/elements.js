@@ -189,3 +189,118 @@ export function screenContaining(elements, element) {
     .filter((screen) => screen.id !== element.id && isInsideScreen(element, screen))
     .pop() || null
 }
+
+/** Rótulo de cada tipo, usado no painel de propriedades e na lista de camadas. */
+export const TYPE_LABEL = {
+  [TOOLS.screen]: 'Tela',
+  [TOOLS.rect]: 'Retângulo',
+  [TOOLS.ellipse]: 'Elipse',
+  [TOOLS.text]: 'Texto',
+  [TOOLS.image]: 'Imagem',
+  [TOOLS.icon]: 'Ícone',
+}
+
+/**
+ * Nome exibido na lista de camadas. `name` é o apelido dado pelo usuário; sem
+ * ele o elemento se identifica pelo próprio conteúdo (o texto digitado, o nome
+ * do ícone) e, em último caso, pelo tipo. Telas já nascem com `name`.
+ */
+export function elementLabel(element) {
+  if (element.name) return element.name
+  if (element.type === TOOLS.text) {
+    const primeira = String(element.text || '').split('\n')[0].trim()
+    return primeira ? primeira.slice(0, 28) : 'Texto'
+  }
+  if (isIcon(element)) return element.nome || 'Ícone'
+  return TYPE_LABEL[element.type] || element.type
+}
+
+export function isHidden(element) {
+  return element.hidden === true
+}
+
+export function isLocked(element) {
+  return element.locked === true
+}
+
+/** O que entra no desenho: oculto some do mapa, da simulação e da leitura. */
+export function visibleElements(elements) {
+  return elements.filter((element) => !isHidden(element))
+}
+
+/**
+ * Irmãos na ordem de desenho: telas se ordenam entre telas, e os demais entre
+ * os que estão na mesma tela — reordenar dentro de uma tela não pode mexer na
+ * ordem de outra.
+ */
+function siblingIndexes(elements, element) {
+  const dono = isScreen(element) ? null : screenContaining(elements, element)?.id ?? null
+  const indexes = []
+
+  elements.forEach((item, index) => {
+    if (isScreen(item) !== isScreen(element)) return
+    if (!isScreen(element) && (screenContaining(elements, item)?.id ?? null) !== dono) return
+    indexes.push(index)
+  })
+
+  return indexes
+}
+
+export const REORDER = {
+  frente: 'frente',
+  tras: 'tras',
+  topo: 'topo',
+  fundo: 'fundo',
+}
+
+/**
+ * Move o elemento na ordem de desenho — quem vem depois no array desenha por
+ * cima. 'frente'/'tras' andam uma posição; 'topo'/'fundo' vão até a ponta.
+ * Devolve o mesmo array quando não há para onde ir.
+ */
+export function reorderElement(elements, id, direction) {
+  const element = elements.find((item) => item.id === id)
+  if (!element) return elements
+
+  const indexes = siblingIndexes(elements, element)
+  const atual = indexes.indexOf(elements.indexOf(element))
+  const ultimo = indexes.length - 1
+  const destino = {
+    [REORDER.frente]: atual + 1,
+    [REORDER.tras]: atual - 1,
+    [REORDER.topo]: ultimo,
+    [REORDER.fundo]: 0,
+  }[direction]
+
+  if (destino === undefined || destino === atual || destino < 0 || destino > ultimo) return elements
+
+  const irmaos = indexes.map((index) => elements[index])
+  const [movido] = irmaos.splice(atual, 1)
+  irmaos.splice(destino, 0, movido)
+
+  const proximo = [...elements]
+  indexes.forEach((index, posicao) => {
+    proximo[index] = irmaos[posicao]
+  })
+  return proximo
+}
+
+/**
+ * Cópias de um elemento, deslocadas para não nascerem em cima do original.
+ * Duplicar uma tela leva junto o conteúdo dela (mesmo deslocamento, para a
+ * geometria relativa se manter) — senão a cópia nasceria vazia.
+ */
+export function duplicateElement(elements, id, offset = 16) {
+  const original = elements.find((item) => item.id === id)
+  if (!original) return []
+
+  const copiar = (element) => {
+    const copia = { ...element, id: createId(), x: element.x + offset, y: element.y + offset }
+    if (element.name) copia.name = `${element.name} cópia`
+    return copia
+  }
+
+  const novo = copiar(original)
+  if (!isScreen(original)) return [novo]
+  return [novo, ...childrenOfScreen(elements, original).map(copiar)]
+}

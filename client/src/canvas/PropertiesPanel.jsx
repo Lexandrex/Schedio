@@ -1,15 +1,6 @@
-import { TOOLS, hasBox, isIcon, isImage, isScreen } from './elements.js'
+import { TOOLS, TYPE_LABEL, elementLabel, hasBox, isIcon, isImage, isScreen } from './elements.js'
 import { TRANSITIONS } from './connections.js'
 import { FONT_FAMILIES, measureText, textStyle } from './textMetrics.js'
-
-const TYPE_LABEL = {
-  [TOOLS.screen]: 'Tela',
-  [TOOLS.rect]: 'Retângulo',
-  [TOOLS.ellipse]: 'Elipse',
-  [TOOLS.text]: 'Texto',
-  [TOOLS.image]: 'Imagem',
-  [TOOLS.icon]: 'Ícone',
-}
 
 function NumberField({ label, value, onChange, min, step }) {
   return (
@@ -251,12 +242,11 @@ function TextFormatSection({ element, update }) {
 }
 
 function ConnectionSection({ connection, elements, onUpdate, onDelete }) {
+  // O mesmo nome que a lista de camadas mostra, para os dois painéis falarem
+  // do mesmo elemento com a mesma palavra.
   const nomeDe = (id) => {
     const alvo = elements.find((element) => element.id === id)
-    if (!alvo) return 'removido'
-    if (isScreen(alvo)) return alvo.name
-    if (alvo.type === TOOLS.text) return `Texto "${String(alvo.text).split('\n')[0].slice(0, 18)}"`
-    return TYPE_LABEL[alvo.type] || alvo.type
+    return alvo ? elementLabel(alvo) : 'removido'
   }
 
   const update = (patch) => onUpdate(connection.id, patch)
@@ -411,6 +401,25 @@ export default function PropertiesPanel({
               Definir como tela inicial
             </button>
           )}
+        </section>
+      )}
+
+      {!isScreen(element) && (
+        <section className="prop-section">
+          <h3>Camada</h3>
+          <label className="prop-field">
+            <span>Nome</span>
+            <input
+              type="text"
+              maxLength={60}
+              placeholder={elementLabel(element)}
+              value={element.name || ''}
+              onChange={(event) => update({ name: event.target.value || null })}
+            />
+          </label>
+          <p className="prop-hint">
+            Sem nome, a lista de camadas identifica o elemento pelo conteúdo.
+          </p>
         </section>
       )}
 

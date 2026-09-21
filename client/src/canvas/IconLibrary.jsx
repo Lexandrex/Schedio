@@ -11,22 +11,17 @@ function porGrupo(icones) {
   return [...grupos.entries()]
 }
 
-export default function IconLibrary({ onAddIcon }) {
+export default function IconLibrary({ onAddIcon, aberta, onAbrir, onFechar }) {
   const [busca, setBusca] = useState('')
-  const [aberta, setAberta] = useState(true)
 
   const grupos = useMemo(() => porGrupo(filtrarIcones(busca)), [busca])
   const total = useMemo(() => filtrarIcones(busca).length, [busca])
 
   if (!aberta) {
     return (
-      <button
-        className="library-toggle library-toggle--fechada"
-        type="button"
-        onClick={() => setAberta(true)}
-        title="Abrir biblioteca de ícones"
-      >
-        ›
+      <button className="rail-closed" type="button" onClick={onAbrir} title="Abrir biblioteca de ícones">
+        <span>Ícones</span>
+        <span aria-hidden="true">›</span>
       </button>
     )
   }
@@ -35,12 +30,7 @@ export default function IconLibrary({ onAddIcon }) {
     <aside className="icon-library">
       <header className="library-header">
         <h2>Ícones</h2>
-        <button
-          className="library-toggle"
-          type="button"
-          onClick={() => setAberta(false)}
-          title="Fechar biblioteca"
-        >
+        <button className="library-toggle" type="button" onClick={onFechar} title="Fechar biblioteca">
           ‹
         </button>
       </header>

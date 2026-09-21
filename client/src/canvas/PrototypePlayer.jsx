@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { childrenOfScreen, screensOf } from './elements.js'
+import { childrenOfScreen, screensOf, visibleElements } from './elements.js'
 import { connectionsFrom } from './connections.js'
 import CanvasElement from './CanvasElement.jsx'
 
@@ -48,7 +48,10 @@ export default function PrototypePlayer({
   exitLabel = 'Sair da simulação (Esc)',
   emptyMessage,
 }) {
-  const screens = useMemo(() => screensOf(elements), [elements])
+  // Camada oculta não entra na simulação nem na leitura — some com o elemento
+  // e, se for uma tela, com a tela inteira.
+  const visiveis = useMemo(() => visibleElements(elements), [elements])
+  const screens = useMemo(() => screensOf(visiveis), [visiveis])
   const first = screens.find((screen) => screen.id === startScreenId) || screens[0]
 
   const [currentId, setCurrentId] = useState(first?.id || null)
@@ -92,9 +95,9 @@ export default function PrototypePlayer({
    */
   const saidas = useMemo(() => {
     if (!current) return []
-    const dentro = new Set([current.id, ...childrenOfScreen(elements, current).map((el) => el.id)])
+    const dentro = new Set([current.id, ...childrenOfScreen(visiveis, current).map((el) => el.id)])
     return connections.filter((connection) => dentro.has(connection.from))
-  }, [current, elements, connections])
+  }, [current, visiveis, connections])
 
   const proxima = saidas.length === 1 ? saidas[0] : null
 
@@ -155,7 +158,7 @@ export default function PrototypePlayer({
               <div className={`player-layer ${saindo}`} style={estilo}>
                 <ScreenView
                   screen={outgoing.screen}
-                  elements={elements}
+                  elements={visiveis}
                   connections={connections}
                   onNavigate={navigate}
                   interactive={false}
@@ -165,7 +168,7 @@ export default function PrototypePlayer({
             <div className={`player-layer ${entrando}`} style={estilo} key={current.id}>
               <ScreenView
                 screen={current}
-                elements={elements}
+                elements={visiveis}
                 connections={connections}
                 onNavigate={navigate}
                 interactive

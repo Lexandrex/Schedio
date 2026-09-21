@@ -6,6 +6,8 @@ import {
   createScreen,
   createShape,
   createText,
+  isHidden,
+  isLocked,
   isScreen,
   normalizeRect,
 } from './elements.js'
@@ -144,9 +146,12 @@ export default function CanvasStage({
       const element = elements.find((item) => item.id === targetId)
       onSelect(targetId)
 
-      // Arrastar uma tela leva junto o que está dentro dela.
+      // Arrastar uma tela leva junto o que está dentro dela — menos o que está
+      // travado, que é justamente o que o usuário pediu para ficar parado.
       const carried = isScreen(element)
-        ? childrenOfScreen(elements, element).map((child) => ({ id: child.id, x: child.x, y: child.y }))
+        ? childrenOfScreen(elements, element)
+            .filter((child) => !isLocked(child))
+            .map((child) => ({ id: child.id, x: child.x, y: child.y }))
         : []
 
       dragRef.current = { mode: 'move', origin: { ...element }, start: point, carried }
@@ -189,14 +194,23 @@ export default function CanvasStage({
     const deltaY = point.y - drag.start.y
 
     if (drag.mode === 'move') {
+      // Shift trava o movimento no eixo em que a mão foi mais longe — alinhar
+      // dois elementos deixa de depender do pulso.
+      let moveX = deltaX
+      let moveY = deltaY
+      if (event.shiftKey) {
+        if (Math.abs(deltaX) >= Math.abs(deltaY)) moveY = 0
+        else moveX = 0
+      }
+
       const patches = {
         [drag.origin.id]: {
-          x: Math.round(drag.origin.x + deltaX),
-          y: Math.round(drag.origin.y + deltaY),
+          x: Math.round(drag.origin.x + moveX),
+          y: Math.round(drag.origin.y + moveY),
         },
       }
       drag.carried.forEach((child) => {
-        patches[child.id] = { x: Math.round(child.x + deltaX), y: Math.round(child.y + deltaY) }
+        patches[child.id] = { x: Math.round(child.x + moveX), y: Math.round(child.y + moveY) }
       })
       onUpdateMany(patches)
       return
@@ -215,6 +229,20 @@ export default function CanvasStage({
       if (handle.includes('n')) {
         height = origin.height - deltaY
         y = origin.y + deltaY
+      }
+
+      // Shift mantém a proporção original. Manda a dimensão que mais variou,
+      // para o arrasto responder na direção em que a mão está indo.
+      if (event.shiftKey && origin.width > 0 && origin.height > 0) {
+        const proporcao = origin.width / origin.height
+        if (Math.abs(width - origin.width) >= Math.abs(height - origin.height) * proporcao) {
+          height = width / proporcao
+        } else {
+          width = height * proporcao
+        }
+        // A âncora é o canto oposto ao que está sendo arrastado.
+        if (handle.includes('w')) x = origin.x + origin.width - width
+        if (handle.includes('n')) y = origin.y + origin.height - height
       }
 
       if (width < MIN_SIZE) {
@@ -318,10 +346,15 @@ export default function CanvasStage({
     return () => svg.removeEventListener('wheel', handleWheel)
   }, [view, onViewChange])
 
-  const byId = new Map(elements.map((element) => [element.id, element]))
+  // Camada oculta não desenha — nem ela, nem as ligações que passam por ela.
+  const visiveis = elements.filter((element) => !isHidden(element))
+  const byId = new Map(visiveis.map((element) => [element.id, element]))
   // Telas ficam atrás; o resto desenha por cima.
-  const screens = elements.filter(isScreen)
-  const others = elements.filter((element) => !isScreen(element))
+  const screens = visiveis.filter(isScreen)
+  const others = visiveis.filter((element) => !isScreen(element))
+  // Travado continua visível, mas sem área de clique: o mapa não o seleciona
+  // nem o arrasta; ele se edita pela lista de camadas.
+  const hitOf = (element) => (isLocked(element) ? null : element.id)
   const pendingElement = pendingFrom ? byId.get(pendingFrom) : null
   const cursor = tool === TOOLS.select ? 'default' : 'crosshair'
 
@@ -388,7 +421,7 @@ export default function CanvasStage({
       <g transform={`translate(${view.x} ${view.y}) scale(${view.zoom})`}>
         {screens.map((screen) => (
           <g key={screen.id}>
-            <CanvasElement element={screen} hitId={screen.id} />
+            <CanvasElement element={screen} hitId={hitOf(screen)} />
             <text
               x={screen.x}
               y={screen.y - 8 / view.zoom}
@@ -405,7 +438,7 @@ export default function CanvasStage({
         {others.map((element) =>
           // Em edição, quem desenha o conteúdo é o textarea sobreposto.
           element.id === editingId ? null : (
-            <CanvasElement key={element.id} element={element} hitId={element.id} />
+            <CanvasElement key={element.id} element={element} hitId={hitOf(element)} />
           ),
         )}
 
@@ -488,8 +521,14 @@ export default function CanvasStage({
 
         {selected && (
           <g pointerEvents="none">
-            <rect {...boxOf(selected)} fill="none" stroke="#aaa1b5" strokeWidth={1.5 / view.zoom} />
-            {HANDLES.map((handle) => {
+            <rect
+              {...boxOf(selected)}
+              fill="none"
+              stroke={isLocked(selected) ? '#e0c58a' : '#aaa1b5'}
+              strokeWidth={1.5 / view.zoom}
+              strokeDasharray={isLocked(selected) ? `${5 / view.zoom} ${4 / view.zoom}` : undefined}
+            />
+            {!isLocked(selected) && HANDLES.map((handle) => {
               const box = boxOf(selected)
               const size = 8 / view.zoom
               const positions = {

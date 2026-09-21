@@ -6,11 +6,31 @@ import CanvasToolbar from '../canvas/CanvasToolbar.jsx'
 import PropertiesPanel from '../canvas/PropertiesPanel.jsx'
 import PrototypePlayer from '../canvas/PrototypePlayer.jsx'
 import IconLibrary from '../canvas/IconLibrary.jsx'
+import LayersPanel from '../canvas/LayersPanel.jsx'
 import { ICON_DEFAULT_SIZE } from '../canvas/iconLibrary.js'
-import { TOOLS, createIcon, createImage, isScreen, screensOf } from '../canvas/elements.js'
+import {
+  TOOLS,
+  boxOf,
+  childrenOfScreen,
+  createIcon,
+  createImage,
+  duplicateElement,
+  isLocked,
+  isScreen,
+  reorderElement,
+  screensOf,
+} from '../canvas/elements.js'
 import { createConnection, pruneConnections } from '../canvas/connections.js'
 
 const AUTOSAVE_MS = 10000
+
+/** Deslocamento de um passo pelas setas do teclado, para ajuste fino. */
+const NUDGE = {
+  ArrowUp: [0, -1],
+  ArrowDown: [0, 1],
+  ArrowLeft: [-1, 0],
+  ArrowRight: [1, 0],
+}
 
 const TOOL_SHORTCUTS = {
   v: TOOLS.select,
@@ -41,6 +61,8 @@ export default function CanvasPage() {
   const imagemInputRef = useRef(null)
   const capaInputRef = useRef(null)
   const [view, setView] = useState({ x: 240, y: 160, zoom: 1 })
+  const [painelIcones, setPainelIcones] = useState(true)
+  const [painelCamadas, setPainelCamadas] = useState(true)
   const [coords, setCoords] = useState({ x: 0, y: 0 })
 
   const [isDirty, setIsDirty] = useState(false)
@@ -217,6 +239,62 @@ export default function CanvasPage() {
     setSelectedId(null)
   }, [])
 
+  const reordenarElemento = useCallback((elementId, direcao) => {
+    setElements((current) => {
+      const proximo = reorderElement(current, elementId, direcao)
+      if (proximo !== current) setIsDirty(true)
+      return proximo
+    })
+  }, [])
+
+  /** A cópia nasce sem as ligações do original — o percurso é redesenhado à mão. */
+  const duplicarElemento = useCallback((elementId) => {
+    const novos = duplicateElement(elementsRef.current, elementId)
+    if (!novos.length) return
+    setElements((current) => [...current, ...novos])
+    setSelectedId(novos[0].id)
+    setSelectedConnectionId(null)
+    setIsDirty(true)
+  }, [])
+
+  /** Move pelo teclado. Como no arraste, tela leva junto o conteúdo não travado. */
+  const moverElemento = useCallback(
+    (elementId, deltaX, deltaY) => {
+      const atuais = elementsRef.current
+      const alvo = atuais.find((element) => element.id === elementId)
+      if (!alvo || isLocked(alvo)) return
+
+      const patches = { [alvo.id]: { x: alvo.x + deltaX, y: alvo.y + deltaY } }
+      if (isScreen(alvo)) {
+        childrenOfScreen(atuais, alvo)
+          .filter((child) => !isLocked(child))
+          .forEach((child) => {
+            patches[child.id] = { x: child.x + deltaX, y: child.y + deltaY }
+          })
+      }
+      updateElements(patches)
+    },
+    [updateElements],
+  )
+
+  /** Traz o elemento para o centro da tela sem mexer no zoom. */
+  const focarElemento = useCallback(
+    (elementId) => {
+      const alvo = elementsRef.current.find((element) => element.id === elementId)
+      if (!alvo) return
+      const box = boxOf(alvo)
+      const viewport = document.querySelector('.canvas-viewport')
+
+      setView((atual) => ({
+        ...atual,
+        x: (viewport?.clientWidth || 800) / 2 - (box.x + box.width / 2) * atual.zoom,
+        y: (viewport?.clientHeight || 600) / 2 - (box.y + box.height / 2) * atual.zoom,
+      }))
+      selectElement(elementId)
+    },
+    [selectElement],
+  )
+
   /** Ferramenta de ligação: 1º clique escolhe a origem, 2º o destino (que precisa ser uma tela). */
   const handleConnectPick = useCallback(
     (elementId) => {
@@ -390,6 +468,24 @@ export default function CanvasPage() {
         return
       }
 
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'd') {
+        event.preventDefault()
+        if (selectedId) duplicarElemento(selectedId)
+        return
+      }
+
+      // Setas movem a seleção: 1px, ou 10px com Shift.
+      const direcao = NUDGE[event.key]
+      if (direcao && selectedId) {
+        event.preventDefault()
+        const passo = event.shiftKey ? 10 : 1
+        moverElemento(selectedId, direcao[0] * passo, direcao[1] * passo)
+        return
+      }
+
+      // Sem esta guarda, Ctrl+C trocaria a ferramenta em vez de copiar.
+      if (event.ctrlKey || event.metaKey || event.altKey) return
+
       const shortcut = TOOL_SHORTCUTS[event.key.toLowerCase()]
       if (shortcut) {
         setTool(shortcut)
@@ -399,7 +495,15 @@ export default function CanvasPage() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedId, selectedConnectionId, deleteElement, deleteConnection, save])
+  }, [
+    selectedId,
+    selectedConnectionId,
+    deleteElement,
+    deleteConnection,
+    duplicarElemento,
+    moverElemento,
+    save,
+  ])
 
   const selected = elements.find((element) => element.id === selectedId) || null
   const selectedConnection = connections.find((item) => item.id === selectedConnectionId) || null
@@ -503,7 +607,29 @@ export default function CanvasPage() {
             onDropIcon={adicionarIcone}
           />
 
-          <IconLibrary onAddIcon={adicionarIcone} />
+          <div className="canvas-rail">
+            <IconLibrary
+              onAddIcon={adicionarIcone}
+              aberta={painelIcones}
+              onAbrir={() => setPainelIcones(true)}
+              onFechar={() => setPainelIcones(false)}
+            />
+
+            <LayersPanel
+              elements={elements}
+              selectedId={selectedId}
+              startScreenId={startScreenId}
+              aberta={painelCamadas}
+              onAbrir={() => setPainelCamadas(true)}
+              onFechar={() => setPainelCamadas(false)}
+              onSelect={selectElement}
+              onUpdate={updateElement}
+              onReorder={reordenarElemento}
+              onDuplicate={duplicarElemento}
+              onDelete={deleteElement}
+              onFocus={focarElemento}
+            />
+          </div>
 
           <CanvasToolbar
             tool={tool}
