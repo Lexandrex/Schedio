@@ -863,6 +863,161 @@ a:hover {
   font-weight: 600;
 }
 
+/* Biblioteca de ícones (lateral esquerda do mapa) */
+.icon-library {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  bottom: 70px;
+  width: 232px;
+  display: flex;
+  flex-direction: column;
+  padding: 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  background: var(--bg-panel);
+  box-shadow: 0 16px 36px rgb(0 0 0 / 34%);
+  z-index: 5;
+}
+
+.library-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.library-header h2 {
+  margin: 0;
+  font-size: 0.86rem;
+  font-weight: 500;
+}
+
+.library-toggle {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border-color);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.library-toggle:hover {
+  color: #fff;
+  border-color: var(--border-strong);
+}
+
+.library-toggle--fechada {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  width: 32px;
+  height: 32px;
+  background: var(--bg-panel);
+  box-shadow: 0 10px 24px rgb(0 0 0 / 30%);
+  z-index: 5;
+}
+
+.library-search {
+  width: 100%;
+  height: 34px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  outline: none;
+  background: var(--bg-input);
+  color: #f6f4f7;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 0.76rem;
+}
+
+.library-search:focus {
+  border-color: var(--accent);
+}
+
+.library-hint,
+.library-vazio,
+.library-total {
+  color: var(--text-secondary);
+  font-size: 0.68rem;
+  line-height: 1.4;
+}
+
+.library-hint {
+  margin: 8px 0 4px;
+}
+
+.library-total {
+  margin: 8px 0 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-color);
+}
+
+.library-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin-right: -6px;
+  padding-right: 6px;
+}
+
+.library-group h3 {
+  margin: 12px 0 6px;
+  color: var(--text-muted);
+  font-size: 0.66rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.library-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+  gap: 6px;
+}
+
+.library-item {
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-input);
+  color: var(--text-muted);
+  cursor: grab;
+  transition: background 0.16s, color 0.16s, border-color 0.16s;
+}
+
+.library-item:hover {
+  background: var(--bg-input-focus);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.library-item:active {
+  cursor: grabbing;
+}
+
+/* Edição de texto no lugar, sobre o mapa */
+.canvas-text-editor {
+  position: absolute;
+  z-index: 6;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--accent);
+  border-radius: 2px;
+  outline: none;
+  background: rgb(25 24 26 / 55%);
+  overflow: hidden;
+  resize: none;
+  white-space: pre;
+}
+
 .canvas-hint {
   position: absolute;
   left: 50%;

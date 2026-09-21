@@ -27,6 +27,41 @@ export default function CanvasElement({ element, hitId = null, hitClassName }) {
     )
   }
 
+  if (element.type === TOOLS.icon) {
+    return (
+      <g opacity={element.opacity}>
+        {/* svg aninhado: o viewBox escala o desenho de 24x24 para a caixa do elemento. */}
+        <svg
+          x={element.x}
+          y={element.y}
+          width={element.width}
+          height={element.height}
+          viewBox="0 0 24 24"
+          overflow="visible"
+        >
+          <path
+            d={element.path}
+            fill="none"
+            stroke={element.fill}
+            strokeWidth={element.strokeWidth}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            pointerEvents="none"
+          />
+        </svg>
+        <rect
+          data-el={hitId || undefined}
+          className={hitClassName}
+          x={element.x}
+          y={element.y}
+          width={element.width}
+          height={element.height}
+          fill="transparent"
+        />
+      </g>
+    )
+  }
+
   if (element.type === TOOLS.image) {
     return (
       <g opacity={element.opacity}>

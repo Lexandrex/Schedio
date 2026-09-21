@@ -1,4 +1,4 @@
-import { TOOLS, hasBox, isImage, isScreen } from './elements.js'
+import { TOOLS, hasBox, isIcon, isImage, isScreen } from './elements.js'
 import { TRANSITIONS } from './connections.js'
 import { FONT_FAMILIES, measureText, textStyle } from './textMetrics.js'
 
@@ -8,6 +8,7 @@ const TYPE_LABEL = {
   [TOOLS.ellipse]: 'Elipse',
   [TOOLS.text]: 'Texto',
   [TOOLS.image]: 'Imagem',
+  [TOOLS.icon]: 'Ícone',
 }
 
 function NumberField({ label, value, onChange, min, step }) {
@@ -381,7 +382,10 @@ export default function PropertiesPanel({
   return (
     <aside className="properties-panel">
       <h2>Propriedades</h2>
-      <p className="properties-type">{TYPE_LABEL[element.type]}</p>
+      <p className="properties-type">
+        {TYPE_LABEL[element.type]}
+        {isIcon(element) && element.nome ? ` — ${element.nome}` : ''}
+      </p>
 
       {isScreen(element) && (
         <section className="prop-section">
@@ -444,13 +448,24 @@ export default function PropertiesPanel({
         {/* Imagem não tem preenchimento nem borda: o conteúdo é o próprio arquivo. */}
         {!isImage(element) && (
           <ColorField
-            label={element.type === TOOLS.text ? 'Cor do texto' : 'Preenchimento'}
+            label={element.type === TOOLS.text ? 'Cor do texto' : isIcon(element) ? 'Cor' : 'Preenchimento'}
             value={element.fill}
             onChange={(fill) => update({ fill })}
           />
         )}
 
-        {hasBox(element) && !isImage(element) && (
+        {/* Ícone é só traço: tem espessura, mas não tem cor de borda separada. */}
+        {isIcon(element) && (
+          <NumberField
+            label="Espessura do traço"
+            value={element.strokeWidth}
+            min={0.5}
+            step={0.1}
+            onChange={(strokeWidth) => update({ strokeWidth })}
+          />
+        )}
+
+        {hasBox(element) && !isImage(element) && !isIcon(element) && (
           <>
             <ColorField label="Borda" value={element.stroke} onChange={(stroke) => update({ stroke })} />
             <NumberField

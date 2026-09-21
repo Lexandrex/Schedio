@@ -10,6 +10,7 @@ import {
   normalizeRect,
 } from './elements.js'
 import { connectionAnchors } from './connections.js'
+import { measureText, textStyle } from './textMetrics.js'
 import CanvasElement from './CanvasElement.jsx'
 
 const MIN_ZOOM = 0.15
@@ -35,13 +36,26 @@ export default function CanvasStage({
   onUpdateMany,
   onConnectPick,
   onPointerCoords,
+  onDropIcon,
 }) {
   const svgRef = useRef(null)
+  const editorRef = useRef(null)
   const dragRef = useRef(null)
   const [draft, setDraft] = useState(null)
   const [cursorPoint, setCursorPoint] = useState(null)
+  const [editingId, setEditingId] = useState(null)
 
   const selected = elements.find((element) => element.id === selectedId) || null
+  const editing = elements.find((element) => element.id === editingId && element.type === TOOLS.text) || null
+
+  // Ao entrar em edição, foca e seleciona tudo — como o Figma faz.
+  useEffect(() => {
+    if (!editingId) return
+    const campo = editorRef.current
+    if (!campo) return
+    campo.focus()
+    campo.select()
+  }, [editingId])
 
   /** Converte coordenadas de tela para coordenadas do canvas. */
   function toCanvasPoint(event) {
@@ -54,6 +68,11 @@ export default function CanvasStage({
 
   function handlePointerDown(event) {
     if (event.button !== 0) return
+
+    // Clicar no mapa encerra a edição. Não dependemos só do `blur`: se o foco
+    // sair por outro caminho (troca de janela), o editor ficaria aberto.
+    if (editingId) setEditingId(null)
+
     const point = toCanvasPoint(event)
     const targetId = event.target.getAttribute?.('data-el')
     const connectionId = event.target.getAttribute?.('data-cx')
@@ -86,7 +105,10 @@ export default function CanvasStage({
     }
 
     if (tool === TOOLS.text) {
-      onCreate(createText(Math.round(point.x), Math.round(point.y)))
+      // Texto novo já entra em edição, com o texto padrão selecionado.
+      const novo = createText(Math.round(point.x), Math.round(point.y))
+      onCreate(novo)
+      setEditingId(novo.id)
       return
     }
 
@@ -220,6 +242,34 @@ export default function CanvasStage({
     setDraft(null)
   }
 
+  /** Duplo clique num texto abre a edição direto na caixa. */
+  function handleDoubleClick(event) {
+    const targetId = event.target.getAttribute?.('data-el')
+    if (!targetId) return
+    const alvo = elements.find((item) => item.id === targetId)
+    if (alvo?.type === TOOLS.text) {
+      dragRef.current = null
+      setEditingId(targetId)
+    }
+  }
+
+  function handleDragOver(event) {
+    if (!event.dataTransfer.types.includes('application/x-schedio-icon')) return
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'copy'
+  }
+
+  function handleDrop(event) {
+    const dados = event.dataTransfer.getData('application/x-schedio-icon')
+    if (!dados) return
+    event.preventDefault()
+    try {
+      onDropIcon(JSON.parse(dados), toCanvasPoint(event))
+    } catch {
+      // Arraste de outra origem: ignora em silêncio.
+    }
+  }
+
   // Zoom com a roda do mouse, ancorado no ponteiro.
   useEffect(() => {
     const svg = svgRef.current
@@ -253,6 +303,7 @@ export default function CanvasStage({
   const cursor = tool === TOOLS.select ? 'default' : 'crosshair'
 
   return (
+    <>
     <svg
       ref={svgRef}
       className="canvas-stage"
@@ -261,6 +312,9 @@ export default function CanvasStage({
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerLeave={handlePointerUp}
+      onDoubleClick={handleDoubleClick}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
     >
       <defs>
         <pattern
@@ -325,9 +379,12 @@ export default function CanvasStage({
           </g>
         ))}
 
-        {others.map((element) => (
-          <CanvasElement key={element.id} element={element} hitId={element.id} />
-        ))}
+        {others.map((element) =>
+          // Em edição, quem desenha o conteúdo é o textarea sobreposto.
+          element.id === editingId ? null : (
+            <CanvasElement key={element.id} element={element} hitId={element.id} />
+          ),
+        )}
 
         {/* Ligações de protótipo */}
         {connections.map((connection) => {
@@ -439,5 +496,46 @@ export default function CanvasStage({
         )}
       </g>
     </svg>
+
+    {/*
+      Edição no lugar: um textarea posicionado por cima do texto, com a mesma
+      fonte, tamanho e alinhamento, para o que se digita parecer o próprio
+      elemento. Fica fora do <svg> porque HTML dentro de SVG (foreignObject)
+      tem suporte irregular.
+    */}
+    {editing && (() => {
+      const estilo = textStyle(editing)
+      const metrics = measureText(editing)
+      return (
+        <textarea
+          ref={editorRef}
+          className="canvas-text-editor"
+          value={editing.text}
+          onChange={(event) => onUpdate(editing.id, { text: event.target.value })}
+          onBlur={() => setEditingId(null)}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') {
+              event.preventDefault()
+              setEditingId(null)
+            }
+          }}
+          style={{
+            left: editing.x * view.zoom + view.x,
+            top: editing.y * view.zoom + view.y,
+            width: Math.max(metrics.width, 24) * view.zoom,
+            height: Math.max(metrics.height, editing.fontSize) * view.zoom,
+            fontSize: editing.fontSize * view.zoom,
+            lineHeight: `${metrics.lineHeight * view.zoom}px`,
+            fontFamily: estilo.fontFamily,
+            fontWeight: estilo.fontWeight,
+            fontStyle: estilo.fontStyle,
+            textDecoration: estilo.textDecoration,
+            textAlign: estilo.textAlign,
+            color: editing.fill,
+          }}
+        />
+      )
+    })()}
+    </>
   )
 }

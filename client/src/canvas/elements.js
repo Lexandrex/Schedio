@@ -7,6 +7,7 @@ export const TOOLS = {
   ellipse: 'ellipse',
   text: 'text',
   image: 'image',
+  icon: 'icon',
   connect: 'connect',
 }
 
@@ -107,6 +108,26 @@ export function createImage(x, y, width, height, src, imageId) {
   }
 }
 
+/**
+ * Ícone da biblioteca. O `path` é copiado para dentro do elemento para que o
+ * desenho não dependa do catálogo continuar igual no futuro.
+ */
+export function createIcon(x, y, size, nome, path) {
+  return {
+    id: createId(),
+    type: TOOLS.icon,
+    x,
+    y,
+    width: size,
+    height: size,
+    nome,
+    path,
+    fill: DEFAULT_TEXT_FILL,
+    strokeWidth: 1.6,
+    opacity: 1,
+  }
+}
+
 export function isScreen(element) {
   return element.type === TOOLS.screen
 }
@@ -115,13 +136,17 @@ export function isImage(element) {
   return element.type === TOOLS.image
 }
 
+export function isIcon(element) {
+  return element.type === TOOLS.icon
+}
+
 export function isShape(element) {
   return element.type === TOOLS.rect || element.type === TOOLS.ellipse
 }
 
 /** Elementos com caixa explícita (x/y/width/height editáveis). */
 export function hasBox(element) {
-  return isScreen(element) || isShape(element) || isImage(element)
+  return isScreen(element) || isShape(element) || isImage(element) || isIcon(element)
 }
 
 /** Caixa de qualquer elemento — texto é medido, o resto já tem as dimensões. */

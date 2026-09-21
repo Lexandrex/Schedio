@@ -5,7 +5,9 @@ import CanvasStage from '../canvas/CanvasStage.jsx'
 import CanvasToolbar from '../canvas/CanvasToolbar.jsx'
 import PropertiesPanel from '../canvas/PropertiesPanel.jsx'
 import PrototypePlayer from '../canvas/PrototypePlayer.jsx'
-import { TOOLS, createImage, isScreen, screensOf } from '../canvas/elements.js'
+import IconLibrary from '../canvas/IconLibrary.jsx'
+import { ICON_DEFAULT_SIZE } from '../canvas/iconLibrary.js'
+import { TOOLS, createIcon, createImage, isScreen, screensOf } from '../canvas/elements.js'
 import { createConnection, pruneConnections } from '../canvas/connections.js'
 
 const AUTOSAVE_MS = 10000
@@ -263,6 +265,32 @@ export default function CanvasPage() {
     setIsDirty(true)
   }, [])
 
+  /** Centro do que está visível, em coordenadas do mapa. */
+  const centroVisivel = useCallback(() => {
+    const viewport = document.querySelector('.canvas-viewport')
+    return {
+      x: ((viewport?.clientWidth || 800) / 2 - view.x) / view.zoom,
+      y: ((viewport?.clientHeight || 600) / 2 - view.y) / view.zoom,
+    }
+  }, [view])
+
+  /** Ícone solto no mapa: fica centrado no ponto onde foi largado. */
+  const adicionarIcone = useCallback(
+    (icone, ponto) => {
+      const destino = ponto || centroVisivel()
+      createElement(
+        createIcon(
+          Math.round(destino.x - ICON_DEFAULT_SIZE / 2),
+          Math.round(destino.y - ICON_DEFAULT_SIZE / 2),
+          ICON_DEFAULT_SIZE,
+          icone.nome,
+          icone.path,
+        ),
+      )
+    },
+    [centroVisivel, createElement],
+  )
+
   /** Lê as dimensões reais do arquivo para a imagem entrar no canvas sem distorcer. */
   async function medirImagem(file) {
     try {
@@ -472,7 +500,10 @@ export default function CanvasPage() {
             onUpdateMany={updateElements}
             onConnectPick={handleConnectPick}
             onPointerCoords={setCoords}
+            onDropIcon={adicionarIcone}
           />
+
+          <IconLibrary onAddIcon={adicionarIcone} />
 
           <CanvasToolbar
             tool={tool}
