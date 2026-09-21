@@ -10,7 +10,7 @@ import {
   normalizeRect,
 } from './elements.js'
 import { connectionAnchors } from './connections.js'
-import { measureText, textStyle } from './textMetrics.js'
+import { measureText, textStyle, verticalOffset } from './textMetrics.js'
 import CanvasElement from './CanvasElement.jsx'
 
 const MIN_ZOOM = 0.15
@@ -41,6 +41,9 @@ export default function CanvasStage({
   const svgRef = useRef(null)
   const editorRef = useRef(null)
   const dragRef = useRef(null)
+  // Último elemento clicado. O `dblclick` não serve para descobrir isso: a
+  // captura de ponteiro do arraste redireciona esse evento para o <svg>.
+  const lastHitRef = useRef(null)
   const [draft, setDraft] = useState(null)
   const [cursorPoint, setCursorPoint] = useState(null)
   const [editingId, setEditingId] = useState(null)
@@ -55,6 +58,17 @@ export default function CanvasStage({
     if (!campo) return
     campo.focus()
     campo.select()
+  }, [editingId])
+
+  // Escape na janela, não só no campo: se o foco escapar (troca de janela, por
+  // exemplo), a tecla precisa encerrar a edição mesmo assim.
+  useEffect(() => {
+    if (!editingId) return undefined
+    function aoTeclar(event) {
+      if (event.key === 'Escape') setEditingId(null)
+    }
+    window.addEventListener('keydown', aoTeclar)
+    return () => window.removeEventListener('keydown', aoTeclar)
   }, [editingId])
 
   /** Converte coordenadas de tela para coordenadas do canvas. */
@@ -77,6 +91,8 @@ export default function CanvasStage({
     const targetId = event.target.getAttribute?.('data-el')
     const connectionId = event.target.getAttribute?.('data-cx')
     const handle = event.target.getAttribute?.('data-handle')
+
+    lastHitRef.current = targetId || null
 
     try {
       svgRef.current.setPointerCapture(event.pointerId)
@@ -105,6 +121,13 @@ export default function CanvasStage({
     }
 
     if (tool === TOOLS.text) {
+      // O `mousedown` de compatibilidade disparado logo depois do `pointerdown`
+      // move o foco para o <svg>. Como o editor já abriu e foi focado aqui, esse
+      // foco roubado virava `blur` e fechava a edição no mesmo clique — o texto
+      // nascia fora de edição. Cancelar o padrão do `pointerdown` suprime o
+      // evento de compatibilidade e o foco fica onde deve.
+      event.preventDefault()
+
       // Texto novo já entra em edição, com o texto padrão selecionado.
       const novo = createText(Math.round(point.x), Math.round(point.y))
       onCreate(novo)
@@ -243,8 +266,8 @@ export default function CanvasStage({
   }
 
   /** Duplo clique num texto abre a edição direto na caixa. */
-  function handleDoubleClick(event) {
-    const targetId = event.target.getAttribute?.('data-el')
+  function handleDoubleClick() {
+    const targetId = lastHitRef.current
     if (!targetId) return
     const alvo = elements.find((item) => item.id === targetId)
     if (alvo?.type === TOOLS.text) {
@@ -506,6 +529,16 @@ export default function CanvasStage({
     {editing && (() => {
       const estilo = textStyle(editing)
       const metrics = measureText(editing)
+      // O editor cobre o conteúdo, não a caixa: começa na linha em que o
+      // <text> desenha (respeitando o alinhamento vertical) e tem a altura do
+      // texto, não a da caixa. Assim nada salta ao entrar em edição e um texto
+      // mais alto que a altura fixa transborda — como no mapa — em vez de ser
+      // cortado pelo `overflow` do campo.
+      const deslocamentoY = verticalOffset(metrics, estilo)
+      const alturaConteudo = Math.max(metrics.contentHeight, editing.fontSize)
+      // Com largura definida o texto reflui dentro dela, igual ao mapa; sem
+      // largura a caixa acompanha o conteúdo e nada deve quebrar.
+      const reflui = editing.width > 0
       return (
         <textarea
           ref={editorRef}
@@ -513,17 +546,14 @@ export default function CanvasStage({
           value={editing.text}
           onChange={(event) => onUpdate(editing.id, { text: event.target.value })}
           onBlur={() => setEditingId(null)}
-          onKeyDown={(event) => {
-            if (event.key === 'Escape') {
-              event.preventDefault()
-              setEditingId(null)
-            }
-          }}
           style={{
             left: editing.x * view.zoom + view.x,
-            top: editing.y * view.zoom + view.y,
+            top: (editing.y + deslocamentoY) * view.zoom + view.y,
             width: Math.max(metrics.width, 24) * view.zoom,
-            height: Math.max(metrics.height, editing.fontSize) * view.zoom,
+            height: alturaConteudo * view.zoom,
+            whiteSpace: reflui ? 'pre-wrap' : 'pre',
+            // Casa com a quebra por caractere de `breakLongWord`.
+            overflowWrap: reflui ? 'anywhere' : 'normal',
             fontSize: editing.fontSize * view.zoom,
             lineHeight: `${metrics.lineHeight * view.zoom}px`,
             fontFamily: estilo.fontFamily,

@@ -1,5 +1,5 @@
 import { TOOLS } from './elements.js'
-import { measureText, textStyle } from './textMetrics.js'
+import { measureText, textStyle, verticalOffset } from './textMetrics.js'
 
 /**
  * Desenha um elemento. É compartilhado entre o editor e o simulador de
@@ -133,9 +133,7 @@ export default function CanvasElement({ element, hitId = null, hitClassName }) {
         ? element.x + metrics.width
         : element.x
 
-  const sobra = metrics.height - metrics.contentHeight
-  const offsetY =
-    style.verticalAlign === 'middle' ? sobra / 2 : style.verticalAlign === 'bottom' ? sobra : 0
+  const offsetY = verticalOffset(metrics, style)
 
   return (
     <g opacity={element.opacity}>

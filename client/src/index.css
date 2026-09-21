@@ -1009,7 +1009,11 @@ a:hover {
   z-index: 6;
   margin: 0;
   padding: 0;
-  border: 1px solid var(--accent);
+  /* Contorno por sombra, não por borda: com `box-sizing: border-box` uma borda
+     de verdade comeria 2px da largura e o editor quebraria a linha antes do
+     texto desenhado no mapa. */
+  border: 0;
+  box-shadow: 0 0 0 1px var(--accent);
   border-radius: 2px;
   outline: none;
   background: rgb(25 24 26 / 55%);

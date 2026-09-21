@@ -32,6 +32,18 @@ export function textStyle(element) {
   }
 }
 
+/**
+ * Deslocamento vertical do conteúdo dentro da caixa. Mora aqui para o desenho
+ * no mapa e a edição no lugar usarem a mesma conta — senão o texto salta ao
+ * entrar em edição.
+ */
+export function verticalOffset(metrics, style) {
+  const sobra = metrics.height - metrics.contentHeight
+  if (style.verticalAlign === 'middle') return sobra / 2
+  if (style.verticalAlign === 'bottom') return sobra
+  return 0
+}
+
 /** Quebra uma palavra que sozinha já é mais larga que a caixa. */
 function breakLongWord(context, word, maxWidth) {
   const chunks = []
