@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { apiRequest } from '../api.js'
 import { screensOf } from '../canvas/elements.js'
+import { parseTags } from '../tags.js'
 
 export default function ProjectDetailPage() {
   const { id } = useParams()
@@ -38,6 +39,7 @@ export default function ProjectDetailPage() {
   }
 
   const telas = screensOf(project.conteudo?.elements || [])
+  const tags = parseTags(project.categoria)
   const autor = project.autor_nome || project.autor_email
   const publicadoEm = new Date(project.criado).toLocaleDateString('pt-BR')
 
@@ -60,7 +62,11 @@ export default function ProjectDetailPage() {
           <p className="detail-author">{autor}</p>
 
           <div className="detail-meta">
-            {project.categoria && <span className="status-chip">{project.categoria}</span>}
+            {tags.map((tag) => (
+              <span className="status-chip" key={tag}>
+                {tag}
+              </span>
+            ))}
             <span className="detail-date">Publicado em {publicadoEm}</span>
           </div>
 

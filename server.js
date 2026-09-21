@@ -10,6 +10,7 @@ const multer = require('multer');
 const { query } = require('./db');
 const { signToken, requireAuth } = require('./auth');
 const storage = require('./storage');
+const { MAX_TAGS_LENGTH, parseTags, formatTags } = require('./tags');
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
@@ -308,18 +309,34 @@ app.get('/api/projects/mine', requireAuth, async (request, response, next) => {
   } catch (error) { return next(error); }
 });
 
+/**
+ * Campos que o dono informa sobre o projeto, validados igual na criação e na
+ * edição. Devolve `{ erro }` com a mensagem pronta quando algo não passa.
+ */
+function dadosDoProjeto(body) {
+  const titulo = (body.titulo || '').trim();
+  const descricao = (body.descricao || '').trim();
+  // O usuário digita várias tags num campo só; gravamos a forma canônica,
+  // com as repetidas já descartadas (ver tags.js).
+  const categoria = formatTags(parseTags(body.categoria));
+
+  if (!titulo || titulo.length > 160) {
+    return { erro: 'Informe um título de até 160 caracteres.' };
+  }
+  if (categoria.length > MAX_TAGS_LENGTH) {
+    return {
+      erro: `As tags devem somar até ${MAX_TAGS_LENGTH} caracteres. Use menos tags ou tags mais curtas.`,
+    };
+  }
+
+  return { titulo, descricao, categoria };
+}
+
 app.post('/api/projects', requireAuth, async (request, response, next) => {
   try {
-    const titulo = (request.body.titulo || '').trim();
-    const descricao = (request.body.descricao || '').trim();
-    const categoria = (request.body.categoria || '').trim();
-
-    if (!titulo || titulo.length > 160) {
-      return response.status(400).json({ message: 'Informe um título de até 160 caracteres.' });
-    }
-    if (categoria.length > 60) {
-      return response.status(400).json({ message: 'A categoria deve ter até 60 caracteres.' });
-    }
+    const dados = dadosDoProjeto(request.body);
+    if (dados.erro) return response.status(400).json({ message: dados.erro });
+    const { titulo, descricao, categoria } = dados;
 
     const result = await query(
       `INSERT INTO projetos (usuario_id, titulo, descricao, categoria)
@@ -342,6 +359,47 @@ app.get('/api/projects/:id', requireAuth, async (request, response, next) => {
     if (!result.rows[0]) {
       return response.status(404).json({ message: 'Projeto não encontrado.' });
     }
+    return response.json({ project: result.rows[0] });
+  } catch (error) {
+    if (error.code === '22P02') return response.status(404).json({ message: 'Projeto não encontrado.' });
+    return next(error);
+  }
+});
+
+/**
+ * Edição dos dados do projeto (título, descrição e tags).
+ *
+ * Só vale com o projeto privado: publicado, ele já está na tela inicial e na
+ * leitura de outras pessoas, então mudar os dados por baixo mudaria o que elas
+ * estão vendo. Para editar, o dono torna privado primeiro.
+ */
+app.patch('/api/projects/:id', requireAuth, async (request, response, next) => {
+  try {
+    // O status vem antes da validação dos campos: com o projeto publicado a
+    // resposta precisa ser sempre a mesma, e não depender do que foi digitado.
+    const atual = await query(
+      'SELECT status FROM projetos WHERE id = $1 AND usuario_id = $2',
+      [request.params.id, request.userId],
+    );
+    if (!atual.rows[0]) {
+      return response.status(404).json({ message: 'Projeto não encontrado.' });
+    }
+    if (atual.rows[0].status === 'publicado') {
+      return response.status(409).json({
+        message: 'Torne o projeto privado para editar os dados dele.',
+      });
+    }
+
+    const dados = dadosDoProjeto(request.body);
+    if (dados.erro) return response.status(400).json({ message: dados.erro });
+    const { titulo, descricao, categoria } = dados;
+
+    const result = await query(
+      `UPDATE projetos SET titulo = $1, descricao = $2, categoria = $3
+       WHERE id = $4 AND usuario_id = $5
+       RETURNING id, titulo, descricao, categoria, capa, status, likes, criado`,
+      [titulo, descricao || null, categoria || null, request.params.id, request.userId],
+    );
     return response.json({ project: result.rows[0] });
   } catch (error) {
     if (error.code === '22P02') return response.status(404).json({ message: 'Projeto não encontrado.' });

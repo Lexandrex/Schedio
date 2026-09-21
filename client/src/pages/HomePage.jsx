@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { apiRequest } from '../api.js'
 import AccountMenu from '../components/AccountMenu.jsx'
+import { parseTags, tagKey } from '../tags.js'
 
 export default function HomePage() {
   const [projects, setProjects] = useState([])
@@ -17,15 +18,24 @@ export default function HomePage() {
       .finally(() => setIsLoading(false))
   }, [])
 
+  // Cada tag vira um filtro próprio: um projeto "Aventura, Ação" aparece nos dois.
+  // "Aventura" e "aventura" são a mesma aba — vale a primeira grafia encontrada.
   const categories = useMemo(() => {
-    const unique = [...new Set(projects.map((project) => project.categoria).filter(Boolean))]
-    return ['Todos', ...unique]
+    const unique = new Map()
+    for (const project of projects) {
+      for (const tag of parseTags(project.categoria)) {
+        if (!unique.has(tagKey(tag))) unique.set(tagKey(tag), tag)
+      }
+    }
+    return ['Todos', ...unique.values()]
   }, [projects])
 
   const visibleProjects = useMemo(() => {
     const term = search.trim().toLowerCase()
     return projects.filter((project) => {
-      const matchesCategory = activeCategory === 'Todos' || project.categoria === activeCategory
+      const matchesCategory =
+        activeCategory === 'Todos' ||
+        parseTags(project.categoria).some((tag) => tagKey(tag) === tagKey(activeCategory))
       const matchesSearch =
         !term ||
         project.titulo.toLowerCase().includes(term) ||

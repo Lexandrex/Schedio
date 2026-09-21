@@ -645,6 +645,54 @@ a:hover {
   cursor: not-allowed;
 }
 
+/* Tags do projeto: uma por chip, nunca as várias num texto só. */
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  /* Os contêineres (cartão, formulário, meta do leitor) já espaçam por gap. */
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* No formulário cada chip carrega o botão de remover aquela tag. */
+.tag-list--editavel .status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding-right: 4px;
+}
+
+.tag-remove {
+  display: grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8rem;
+  line-height: 1;
+}
+
+.tag-remove:hover {
+  background: #4a2f31;
+  color: #f4a3a3;
+}
+
+/* Regra de preenchimento sob um campo (ex.: como separar as tags). */
+.field-hint {
+  /* Colada no campo que explica, sem o gap cheio do formulário. */
+  margin: -8px 0 0;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+}
+
 /* Status público/privado */
 .status-chip {
   padding: 2px 9px;
