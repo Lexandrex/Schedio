@@ -1,4 +1,13 @@
-import { TOOLS, TYPE_LABEL, elementLabel, hasBox, isIcon, isImage, isScreen } from './elements.js'
+import {
+  TOOLS,
+  TYPE_LABEL,
+  clipsContent,
+  elementLabel,
+  hasBox,
+  isIcon,
+  isImage,
+  isScreen,
+} from './elements.js'
 import { TRANSITIONS } from './connections.js'
 import { FONT_FAMILIES, measureText, textStyle } from './textMetrics.js'
 
@@ -389,6 +398,25 @@ export default function PropertiesPanel({
               onChange={(event) => update({ name: event.target.value })}
             />
           </label>
+
+          <div className="prop-field">
+            <span>Conteúdo</span>
+            <div className="format-group">
+              <ToggleButton
+                active={clipsContent(element)}
+                onClick={() => update({ clip: !clipsContent(element) })}
+                label="Cortar na borda"
+                title="Esconder o que passa da borda da tela"
+                style={{ width: 'auto', padding: '0 12px' }}
+              />
+            </div>
+          </div>
+
+          <p className="prop-hint">
+            {clipsContent(element)
+              ? 'O que passa da borda fica escondido, como na simulação.'
+              : 'O conteúdo transborda no mapa. Na simulação a borda corta mesmo assim.'}
+          </p>
 
           {isStartScreen ? (
             <p className="prop-hint">▶ É a tela inicial da simulação.</p>

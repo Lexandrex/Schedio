@@ -82,6 +82,7 @@ export function createScreen(x, y, width, height, name) {
     width,
     height,
     name: name || 'Tela',
+    clip: true,
     fill: DEFAULT_SCREEN_FILL,
     stroke: DEFAULT_SCREEN_STROKE,
     strokeWidth: 1,
@@ -130,6 +131,16 @@ export function createIcon(x, y, size, nome, path) {
 
 export function isScreen(element) {
   return element.type === TOOLS.screen
+}
+
+/**
+ * Tela recorta o conteúdo na própria borda, como o "clip content" do Figma: o
+ * que passa do limite some em vez de vazar sobre o mapa. Ausente o campo, a
+ * tela recorta — é o padrão, e documentos antigos passam a se comportar como
+ * na simulação, que sempre recortou pelo viewBox da tela.
+ */
+export function clipsContent(screen) {
+  return screen.clip !== false
 }
 
 export function isImage(element) {

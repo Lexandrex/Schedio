@@ -3,6 +3,7 @@ import {
   TOOLS,
   boxOf,
   childrenOfScreen,
+  clipsContent,
   createScreen,
   createShape,
   createText,
@@ -10,6 +11,7 @@ import {
   isLocked,
   isScreen,
   normalizeRect,
+  screenContaining,
 } from './elements.js'
 import { connectionAnchors } from './connections.js'
 import { measureText, textStyle, verticalOffset } from './textMetrics.js'
@@ -355,6 +357,16 @@ export default function CanvasStage({
   // Travado continua visível, mas sem área de clique: o mapa não o seleciona
   // nem o arrasta; ele se edita pela lista de camadas.
   const hitOf = (element) => (isLocked(element) ? null : element.id)
+
+  // Quem está dentro de uma tela é recortado pela borda dela. É o mesmo que a
+  // simulação sempre fez (lá o viewBox da tela corta), trazido para o mapa:
+  // arrastar algo maior que a tela para dentro dela agora mostra só o pedaço
+  // que cabe, em vez de o excedente vazar por cima do resto do mapa.
+  const recorteDe = new Map()
+  for (const element of others) {
+    const dono = screenContaining(visiveis, element)
+    if (dono && clipsContent(dono)) recorteDe.set(element.id, dono.id)
+  }
   const pendingElement = pendingFrom ? byId.get(pendingFrom) : null
   const cursor = tool === TOOLS.select ? 'default' : 'crosshair'
 
@@ -410,6 +422,24 @@ export default function CanvasStage({
         <marker id="cx-arrow-active" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
           <path d="M 0 0 L 10 5 L 0 10 z" fill="#c3b5ff" />
         </marker>
+
+        {/*
+          Recorte de cada tela. As coordenadas são as do mapa porque o clip é
+          resolvido no espaço de quem o usa — os elementos, que estão dentro do
+          <g> do pan/zoom —, não na posição do <defs>. O `rx` acompanha o raio
+          da tela, então o conteúdo também dobra nos cantos arredondados.
+        */}
+        {screens.filter(clipsContent).map((screen) => (
+          <clipPath key={screen.id} id={`recorte-${screen.id}`}>
+            <rect
+              x={screen.x}
+              y={screen.y}
+              width={screen.width}
+              height={screen.height}
+              rx={screen.radius}
+            />
+          </clipPath>
+        ))}
       </defs>
 
       <rect width="100%" height="100%" fill="url(#grid-block)" />
@@ -435,12 +465,17 @@ export default function CanvasStage({
           </g>
         ))}
 
-        {others.map((element) =>
+        {others.map((element) => {
           // Em edição, quem desenha o conteúdo é o textarea sobreposto.
-          element.id === editingId ? null : (
-            <CanvasElement key={element.id} element={element} hitId={hitOf(element)} />
-          ),
-        )}
+          if (element.id === editingId) return null
+          const recorte = recorteDe.get(element.id)
+
+          return (
+            <g key={element.id} clipPath={recorte ? `url(#recorte-${recorte})` : undefined}>
+              <CanvasElement element={element} hitId={hitOf(element)} />
+            </g>
+          )
+        })}
 
         {/* Ligações de protótipo */}
         {connections.map((connection) => {
