@@ -1387,6 +1387,11 @@ a:hover {
   inset: 0;
 }
 
+/* A camada que sai só está ali para ser vista: o clique vai para a que entra. */
+.player-layer--saindo {
+  pointer-events: none;
+}
+
 .player-screen {
   width: 100%;
   height: 100%;

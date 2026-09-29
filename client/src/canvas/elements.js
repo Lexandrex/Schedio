@@ -300,18 +300,30 @@ export function reorderElement(elements, id, direction) {
  * Cópias de um elemento, deslocadas para não nascerem em cima do original.
  * Duplicar uma tela leva junto o conteúdo dela (mesmo deslocamento, para a
  * geometria relativa se manter) — senão a cópia nasceria vazia.
+ *
+ * Toda cópia guarda em `origemId` de quem descende. É o que a transição
+ * inteligente usa para parear elementos entre telas: duplica-se a tela, mexe-se
+ * no conteúdo, e cada elemento sabe quem ele era na tela de origem. Pelo mesmo
+ * motivo o conteúdo da tela duplicada mantém o nome — só quem foi duplicado
+ * diretamente ganha " cópia", para a lista de camadas distinguir os dois.
  */
 export function duplicateElement(elements, id, offset = 16) {
   const original = elements.find((item) => item.id === id)
   if (!original) return []
 
-  const copiar = (element) => {
-    const copia = { ...element, id: createId(), x: element.x + offset, y: element.y + offset }
-    if (element.name) copia.name = `${element.name} cópia`
+  const copiar = (element, renomear) => {
+    const copia = {
+      ...element,
+      id: createId(),
+      origemId: element.origemId || element.id,
+      x: element.x + offset,
+      y: element.y + offset,
+    }
+    if (renomear && element.name) copia.name = `${element.name} cópia`
     return copia
   }
 
-  const novo = copiar(original)
+  const novo = copiar(original, true)
   if (!isScreen(original)) return [novo]
-  return [novo, ...childrenOfScreen(elements, original).map(copiar)]
+  return [novo, ...childrenOfScreen(elements, original).map((element) => copiar(element, false))]
 }

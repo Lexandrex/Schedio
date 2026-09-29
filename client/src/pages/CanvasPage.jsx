@@ -314,11 +314,10 @@ export default function CanvasPage() {
         return
       }
 
+      // O destino pode ser uma tela, um objeto dentro de uma tela (a simulação
+      // aproxima a câmera nele) ou um objeto fora das telas (abre por cima).
       const alvo = elementsRef.current.find((element) => element.id === elementId)
-      if (!alvo || !isScreen(alvo)) {
-        setError('A ligação precisa terminar em uma tela. Selecione uma tela como destino.')
-        return
-      }
+      if (!alvo) return
 
       const jaExiste = connectionsRef.current.some(
         (connection) => connection.from === pendingFrom && connection.to === elementId,
@@ -650,7 +649,7 @@ export default function CanvasPage() {
           {tool === TOOLS.connect && (
             <p className="canvas-hint">
               {pendingFrom
-                ? 'Agora clique na tela de destino.'
+                ? 'Agora clique no destino: uma tela, um objeto dentro dela ou um objeto fora das telas (abre por cima).'
                 : 'Clique no elemento de origem (um botão, forma ou tela).'}
             </p>
           )}

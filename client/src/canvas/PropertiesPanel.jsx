@@ -7,8 +7,17 @@ import {
   isIcon,
   isImage,
   isScreen,
+  screenContaining,
 } from './elements.js'
-import { TRANSITIONS } from './connections.js'
+import {
+  SCROLL_DIRECTIONS,
+  TRANSITIONS,
+  TRIGGERS,
+  delayOf,
+  destinationKind,
+  directionOf,
+  triggerOf,
+} from './connections.js'
 import { FONT_FAMILIES, measureText, textStyle } from './textMetrics.js'
 
 function NumberField({ label, value, onChange, min, step }) {
@@ -250,6 +259,31 @@ function TextFormatSection({ element, update }) {
   )
 }
 
+/** O que acontece ao chegar no destino, dito para o usuário. */
+function DestinoHint({ connection, elements, nomeDe }) {
+  const alvo = elements.find((element) => element.id === connection.to)
+  const tipo = destinationKind(elements, alvo)
+
+  if (tipo === 'focus') {
+    const tela = screenContaining(elements, alvo)
+    return (
+      <p className="prop-hint">
+        Vai até <strong>{tela.name || 'a tela'}</strong> e aproxima a câmera em{' '}
+        <strong>{nomeDe(alvo.id)}</strong>.
+      </p>
+    )
+  }
+  if (tipo === 'overlay') {
+    return (
+      <p className="prop-hint">
+        Abre <strong>{nomeDe(alvo.id)}</strong> por cima da tela atual, centralizado, junto com o que
+        estiver empilhado sobre ele. Clicar fora fecha.
+      </p>
+    )
+  }
+  return null
+}
+
 function ConnectionSection({ connection, elements, onUpdate, onDelete }) {
   // O mesmo nome que a lista de camadas mostra, para os dois painéis falarem
   // do mesmo elemento com a mesma palavra.
@@ -259,6 +293,7 @@ function ConnectionSection({ connection, elements, onUpdate, onDelete }) {
   }
 
   const update = (patch) => onUpdate(connection.id, patch)
+  const trigger = triggerOf(connection)
 
   return (
     <aside className="properties-panel">
@@ -270,6 +305,7 @@ function ConnectionSection({ connection, elements, onUpdate, onDelete }) {
         <p className="prop-hint">
           De <strong>{nomeDe(connection.from)}</strong> para <strong>{nomeDe(connection.to)}</strong>.
         </p>
+        <DestinoHint connection={connection} elements={elements} nomeDe={nomeDe} />
       </section>
 
       <section className="prop-section">
@@ -277,10 +313,49 @@ function ConnectionSection({ connection, elements, onUpdate, onDelete }) {
 
         <label className="prop-field">
           <span>Gatilho</span>
-          <select className="prop-select" value={connection.trigger} disabled>
-            <option value="click">Ao clicar</option>
+          <select
+            className="prop-select"
+            value={trigger}
+            onChange={(event) => update({ trigger: event.target.value })}
+          >
+            {TRIGGERS.map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label}
+              </option>
+            ))}
           </select>
         </label>
+
+        {trigger === 'hover' && (
+          <p className="prop-hint">Ao tirar o mouse de cima, volta para onde estava.</p>
+        )}
+
+        {trigger === 'scroll' && (
+          <label className="prop-field">
+            <span>Direção</span>
+            <select
+              className="prop-select"
+              value={directionOf(connection)}
+              onChange={(event) => update({ direction: event.target.value })}
+            >
+              {SCROLL_DIRECTIONS.map((item) => (
+                <option key={item.value} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
+        {trigger === 'delay' && (
+          <NumberField
+            label="Espera (ms)"
+            value={delayOf(connection)}
+            min={0}
+            step={100}
+            onChange={(delay) => update({ delay: Math.max(0, delay) })}
+          />
+        )}
 
         <label className="prop-field">
           <span>Transição</span>
@@ -296,6 +371,13 @@ function ConnectionSection({ connection, elements, onUpdate, onDelete }) {
             ))}
           </select>
         </label>
+
+        {connection.transition === 'smart' && (
+          <p className="prop-hint">
+            Elementos com o mesmo nome nas duas telas, ou que vieram de duplicar a tela, se
+            transformam de um estado no outro. Os demais aparecem e somem suavemente.
+          </p>
+        )}
 
         {connection.transition !== 'instant' && (
           <NumberField
