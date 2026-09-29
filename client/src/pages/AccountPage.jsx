@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { apiRequest } from '../api.js'
 import { useAuth } from '../context/AuthContext.jsx'
+import ProfileWorks from '../components/ProfileWorks.jsx'
 import UserIcon from '../components/UserIcon.jsx'
 
 const DEFAULT_COLOR = '#19181a'
@@ -19,6 +20,17 @@ export default function AccountPage() {
   const [showDeleteForm, setShowDeleteForm] = useState(false)
   const [deletePassword, setDeletePassword] = useState('')
   const [isDeleting, setIsDeleting] = useState(false)
+
+  const [projects, setProjects] = useState([])
+  const [projectsLoading, setProjectsLoading] = useState(true)
+  const [projectsError, setProjectsError] = useState('')
+
+  useEffect(() => {
+    apiRequest(`/api/users/${user.id}/perfil`)
+      .then((data) => setProjects(data.projects))
+      .catch((requestError) => setProjectsError(requestError.message))
+      .finally(() => setProjectsLoading(false))
+  }, [user.id])
 
   async function handleSave(event) {
     event.preventDefault()
@@ -68,101 +80,110 @@ export default function AccountPage() {
         <span className="brand-mark">S</span>
       </header>
 
-      <div className="account-layout">
-        <section className="account-card">
-          <div className="account-profile-row">
-            <span className="account-avatar" aria-hidden="true">
-              <UserIcon size={34} />
-            </span>
-            <div>
-              <h1>{user.nome || user.email}</h1>
-              <p className="subtitle">{user.email}</p>
-            </div>
-          </div>
-
-          <form className="auth-form" onSubmit={handleSave}>
-            <label>
-              <span>Nome de usuário</span>
-              <input
-                type="text"
-                maxLength={80}
-                required
-                value={nome}
-                onChange={(event) => setNome(event.target.value)}
-              />
-            </label>
-
-            <label>
-              <span>Descrição</span>
-              <textarea
-                className="bio-textarea"
-                maxLength={BIO_LIMIT}
-                placeholder="Fale um pouco sobre você..."
-                value={bio}
-                onChange={(event) => setBio(event.target.value)}
-              />
-              <span className="char-counter">{bio.length}/{BIO_LIMIT}</span>
-            </label>
-
-            <label>
-              <span>Cor de fundo</span>
-              <div className="color-row">
-                <input
-                  className="color-input"
-                  type="color"
-                  value={cor}
-                  onChange={(event) => setCor(event.target.value)}
-                />
-                <span className="color-value">{cor}</span>
+      <div className="profile-layout">
+        <div className="account-layout">
+          <section className="account-card">
+            <div className="account-profile-row">
+              <span className="account-avatar" aria-hidden="true">
+                <UserIcon size={34} />
+              </span>
+              <div>
+                <h1>{user.nome || user.email}</h1>
+                <p className="subtitle">{user.email}</p>
               </div>
-            </label>
+            </div>
 
-            <button className="primary-button" type="submit" disabled={isSaving}>
-              {isSaving ? 'Salvando...' : 'Salvar alterações'}
-            </button>
-          </form>
-
-          {feedback.message && (
-            <p className="feedback" role="status" data-type={feedback.type}>
-              {feedback.message}
-            </p>
-          )}
-        </section>
-
-        <section className="account-card account-danger">
-          <h2>Excluir conta</h2>
-          <p className="subtitle">
-            Essa ação é permanente e remove seus dados e projetos da plataforma.
-          </p>
-
-          {!showDeleteForm ? (
-            <button className="danger-button" type="button" onClick={() => setShowDeleteForm(true)}>
-              Excluir conta
-            </button>
-          ) : (
-            <form className="auth-form" onSubmit={handleDelete}>
+            <form className="auth-form" onSubmit={handleSave}>
               <label>
-                <span>Confirme sua senha para continuar</span>
+                <span>Nome de usuário</span>
                 <input
-                  type="password"
+                  type="text"
+                  maxLength={80}
                   required
-                  autoComplete="current-password"
-                  value={deletePassword}
-                  onChange={(event) => setDeletePassword(event.target.value)}
+                  value={nome}
+                  onChange={(event) => setNome(event.target.value)}
                 />
               </label>
 
-              <div className="account-danger-actions">
-                <button className="text-button" type="button" onClick={() => setShowDeleteForm(false)}>
-                  Cancelar
-                </button>
-                <button className="danger-button" type="submit" disabled={isDeleting}>
-                  {isDeleting ? 'Excluindo...' : 'Confirmar exclusão'}
-                </button>
-              </div>
+              <label>
+                <span>Descrição</span>
+                <textarea
+                  className="bio-textarea"
+                  maxLength={BIO_LIMIT}
+                  placeholder="Fale um pouco sobre você..."
+                  value={bio}
+                  onChange={(event) => setBio(event.target.value)}
+                />
+                <span className="char-counter">{bio.length}/{BIO_LIMIT}</span>
+              </label>
+
+              <label>
+                <span>Cor de fundo</span>
+                <div className="color-row">
+                  <input
+                    className="color-input"
+                    type="color"
+                    value={cor}
+                    onChange={(event) => setCor(event.target.value)}
+                  />
+                  <span className="color-value">{cor}</span>
+                </div>
+              </label>
+
+              <button className="primary-button" type="submit" disabled={isSaving}>
+                {isSaving ? 'Salvando...' : 'Salvar alterações'}
+              </button>
             </form>
-          )}
-        </section>
+
+            {feedback.message && (
+              <p className="feedback" role="status" data-type={feedback.type}>
+                {feedback.message}
+              </p>
+            )}
+          </section>
+
+          <section className="account-card account-danger">
+            <h2>Excluir conta</h2>
+            <p className="subtitle">
+              Essa ação é permanente e remove seus dados e projetos da plataforma.
+            </p>
+
+            {!showDeleteForm ? (
+              <button className="danger-button" type="button" onClick={() => setShowDeleteForm(true)}>
+                Excluir conta
+              </button>
+            ) : (
+              <form className="auth-form" onSubmit={handleDelete}>
+                <label>
+                  <span>Confirme sua senha para continuar</span>
+                  <input
+                    type="password"
+                    required
+                    autoComplete="current-password"
+                    value={deletePassword}
+                    onChange={(event) => setDeletePassword(event.target.value)}
+                  />
+                </label>
+
+                <div className="account-danger-actions">
+                  <button className="text-button" type="button" onClick={() => setShowDeleteForm(false)}>
+                    Cancelar
+                  </button>
+                  <button className="danger-button" type="submit" disabled={isDeleting}>
+                    {isDeleting ? 'Excluindo...' : 'Confirmar exclusão'}
+                  </button>
+                </div>
+              </form>
+            )}
+          </section>
+        </div>
+
+        <ProfileWorks
+          projects={projects}
+          isOwner
+          isLoading={projectsLoading}
+          error={projectsError}
+        />
       </div>
     </div>
   )

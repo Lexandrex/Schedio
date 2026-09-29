@@ -238,6 +238,37 @@ app.delete('/api/users/me', requireAuth, async (request, response, next) => {
   } catch (error) { return next(error); }
 });
 
+/**
+ * Perfil público de um criador: dados de apresentação e as obras dele.
+ *
+ * Quem visita vê só as obras publicadas. O próprio dono vê todas, com o
+ * status, porque para ele a lista também é um atalho para as que estão em
+ * andamento.
+ */
+app.get('/api/users/:id/perfil', requireAuth, async (request, response, next) => {
+  try {
+    const userResult = await query(
+      'SELECT id, nome, email, bio FROM users WHERE id = $1',
+      [request.params.id],
+    );
+    const user = userResult.rows[0];
+    if (!user) return response.status(404).json({ message: 'Perfil não encontrado.' });
+
+    const isOwner = user.id === request.userId;
+    const projectsResult = await query(
+      `SELECT id, titulo, descricao, categoria, capa, status, likes, criado
+       FROM projetos
+       WHERE usuario_id = $1 AND ($2 OR status = 'publicado')
+       ORDER BY criado DESC`,
+      [user.id, isOwner],
+    );
+    return response.json({ user, isOwner, projects: projectsResult.rows });
+  } catch (error) {
+    if (error.code === '22P02') return response.status(404).json({ message: 'Perfil não encontrado.' });
+    return next(error);
+  }
+});
+
 app.post('/api/auth/email-verification/resend', async (request, response, next) => {
   try {
     if (!mailTransport) return response.status(503).json({ message: 'O serviço de e-mail ainda não está configurado.' });
@@ -286,7 +317,8 @@ app.post('/api/auth/email-verification/verify', async (request, response, next) 
 app.get('/api/projects', requireAuth, async (_request, response, next) => {
   try {
     const result = await query(
-      `SELECT p.id, p.titulo, p.categoria, p.capa, p.criado, p.likes, u.nome AS autor_nome, u.email AS autor_email
+      `SELECT p.id, p.titulo, p.categoria, p.capa, p.criado, p.likes,
+              u.id AS autor_id, u.nome AS autor_nome, u.email AS autor_email
        FROM projetos p
        JOIN users u ON u.id = p.usuario_id
        WHERE p.status = 'publicado'
@@ -416,7 +448,7 @@ app.get('/api/projects/:id/leitura', requireAuth, async (request, response, next
   try {
     const result = await query(
       `SELECT p.id, p.titulo, p.descricao, p.categoria, p.capa, p.criado, p.likes, p.conteudo,
-              u.nome AS autor_nome, u.email AS autor_email, u.bio AS autor_bio
+              u.id AS autor_id, u.nome AS autor_nome, u.email AS autor_email, u.bio AS autor_bio
        FROM projetos p
        JOIN users u ON u.id = p.usuario_id
        WHERE p.id = $1 AND p.status = 'publicado'`,

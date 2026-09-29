@@ -59,7 +59,11 @@ export default function ProjectDetailPage() {
 
         <div className="detail-info">
           <h1>{project.titulo}</h1>
-          <p className="detail-author">{autor}</p>
+          <p className="detail-author">
+            <Link className="detail-author-link" to={`/perfil/${project.autor_id}`}>
+              {autor}
+            </Link>
+          </p>
 
           <div className="detail-meta">
             {tags.map((tag) => (
