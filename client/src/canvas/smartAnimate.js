@@ -41,7 +41,7 @@ const CORES = ['fill', 'stroke']
 
 /** Campos que não dá para interpolar: quando mudam, o par troca por esmaecimento cruzado. */
 const CONTEUDO = {
-  [TOOLS.text]: ['text', 'fontFamily', 'fontWeight', 'fontStyle', 'textDecoration'],
+  [TOOLS.text]: ['text', 'runs', 'fontFamily', 'fontWeight', 'fontStyle', 'textDecoration'],
   [TOOLS.icon]: ['path'],
   [TOOLS.image]: ['src'],
 }
@@ -70,7 +70,11 @@ function mixPair(a, b, t) {
   mistura.opacity = lerp(opacidade(a), opacidade(b), t)
 
   const campos = CONTEUDO[b.type] || []
-  const mudou = campos.some((campo) => a[campo] !== b[campo])
+  // `runs` (formatação por caractere) é uma lista: compara pelo conteúdo, não
+  // pela referência, senão duas telas com a mesma formatação esmaeceriam.
+  const mudou = campos.some((campo) =>
+    campo === 'runs' ? JSON.stringify(a.runs ?? null) !== JSON.stringify(b.runs ?? null) : a[campo] !== b[campo],
+  )
   if (!mudou) return [{ key: b.id, element: mistura }]
 
   const antigo = { ...mistura, opacity: mistura.opacity * (1 - t) }

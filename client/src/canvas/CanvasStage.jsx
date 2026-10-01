@@ -14,8 +14,9 @@ import {
   screenContaining,
 } from './elements.js'
 import { connectionAnchors } from './connections.js'
-import { measureText, textStyle, verticalOffset } from './textMetrics.js'
+import { onFontsLoaded } from './textMetrics.js'
 import CanvasElement from './CanvasElement.jsx'
+import TextEditor from './TextEditor.jsx'
 
 const MIN_ZOOM = 0.15
 const MAX_ZOOM = 4
@@ -41,9 +42,9 @@ export default function CanvasStage({
   onConnectPick,
   onPointerCoords,
   onDropIcon,
+  onTextSelection,
 }) {
   const svgRef = useRef(null)
-  const editorRef = useRef(null)
   const dragRef = useRef(null)
   // Último elemento clicado. O `dblclick` não serve para descobrir isso: a
   // captura de ponteiro do arraste redireciona esse evento para o <svg>.
@@ -52,17 +53,13 @@ export default function CanvasStage({
   const [cursorPoint, setCursorPoint] = useState(null)
   const [editingId, setEditingId] = useState(null)
 
+  // Texto medido antes da web font carregar usou a fonte de reserva: quando
+  // ela chega, redesenha para medir de novo.
+  const [, setFontes] = useState(0)
+  useEffect(() => onFontsLoaded(() => setFontes((versao) => versao + 1)), [])
+
   const selected = elements.find((element) => element.id === selectedId) || null
   const editing = elements.find((element) => element.id === editingId && element.type === TOOLS.text) || null
-
-  // Ao entrar em edição, foca e seleciona tudo — como o Figma faz.
-  useEffect(() => {
-    if (!editingId) return
-    const campo = editorRef.current
-    if (!campo) return
-    campo.focus()
-    campo.select()
-  }, [editingId])
 
   // Escape na janela, não só no campo: se o foco escapar (troca de janela, por
   // exemplo), a tecla precisa encerrar a edição mesmo assim.
@@ -466,7 +463,7 @@ export default function CanvasStage({
         ))}
 
         {others.map((element) => {
-          // Em edição, quem desenha o conteúdo é o textarea sobreposto.
+          // Em edição, quem desenha o conteúdo é o editor sobreposto.
           if (element.id === editingId) return null
           const recorte = recorteDe.get(element.id)
 
@@ -595,51 +592,20 @@ export default function CanvasStage({
     </svg>
 
     {/*
-      Edição no lugar: um textarea posicionado por cima do texto, com a mesma
-      fonte, tamanho e alinhamento, para o que se digita parecer o próprio
-      elemento. Fica fora do <svg> porque HTML dentro de SVG (foreignObject)
-      tem suporte irregular.
+      Edição no lugar, com formatação por caractere: selecionar parte do texto
+      e mudar cor, fonte ou estilo (no painel ou com Ctrl+B/I/U) vale só para
+      o trecho selecionado.
     */}
-    {editing && (() => {
-      const estilo = textStyle(editing)
-      const metrics = measureText(editing)
-      // O editor cobre o conteúdo, não a caixa: começa na linha em que o
-      // <text> desenha (respeitando o alinhamento vertical) e tem a altura do
-      // texto, não a da caixa. Assim nada salta ao entrar em edição e um texto
-      // mais alto que a altura fixa transborda — como no mapa — em vez de ser
-      // cortado pelo `overflow` do campo.
-      const deslocamentoY = verticalOffset(metrics, estilo)
-      const alturaConteudo = Math.max(metrics.contentHeight, editing.fontSize)
-      // Com largura definida o texto reflui dentro dela, igual ao mapa; sem
-      // largura a caixa acompanha o conteúdo e nada deve quebrar.
-      const reflui = editing.width > 0
-      return (
-        <textarea
-          ref={editorRef}
-          className="canvas-text-editor"
-          value={editing.text}
-          onChange={(event) => onUpdate(editing.id, { text: event.target.value })}
-          onBlur={() => setEditingId(null)}
-          style={{
-            left: editing.x * view.zoom + view.x,
-            top: (editing.y + deslocamentoY) * view.zoom + view.y,
-            width: Math.max(metrics.width, 24) * view.zoom,
-            height: alturaConteudo * view.zoom,
-            whiteSpace: reflui ? 'pre-wrap' : 'pre',
-            // Casa com a quebra por caractere de `breakLongWord`.
-            overflowWrap: reflui ? 'anywhere' : 'normal',
-            fontSize: editing.fontSize * view.zoom,
-            lineHeight: `${metrics.lineHeight * view.zoom}px`,
-            fontFamily: estilo.fontFamily,
-            fontWeight: estilo.fontWeight,
-            fontStyle: estilo.fontStyle,
-            textDecoration: estilo.textDecoration,
-            textAlign: estilo.textAlign,
-            color: editing.fill,
-          }}
-        />
-      )
-    })()}
+    {editing && (
+      <TextEditor
+        key={editing.id}
+        element={editing}
+        view={view}
+        onChange={(patch) => onUpdate(editing.id, patch)}
+        onSelectionChange={(selecao) => onTextSelection?.(selecao && { id: editing.id, ...selecao })}
+        onClose={() => setEditingId(null)}
+      />
+    )}
     </>
   )
 }

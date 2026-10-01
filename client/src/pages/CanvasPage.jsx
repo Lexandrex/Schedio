@@ -21,6 +21,7 @@ import {
   screensOf,
 } from '../canvas/elements.js'
 import { createConnection, pruneConnections } from '../canvas/connections.js'
+import { createStore, useStore } from '../canvas/store.js'
 
 const AUTOSAVE_MS = 10000
 
@@ -41,6 +42,16 @@ const TOOL_SHORTCUTS = {
   c: TOOLS.connect,
 }
 
+/** Coordenadas do mouse no mapa — o único que re-renderiza quando o mouse anda. */
+function Coordenadas({ store }) {
+  const coords = useStore(store)
+  return (
+    <span>
+      X {Math.round(coords.x)} · Y {Math.round(coords.y)}
+    </span>
+  )
+}
+
 export default function CanvasPage() {
   const { id } = useParams()
 
@@ -56,6 +67,10 @@ export default function CanvasPage() {
   const [selectedId, setSelectedId] = useState(null)
   const [selectedConnectionId, setSelectedConnectionId] = useState(null)
   const [pendingFrom, setPendingFrom] = useState(null)
+  // Trecho selecionado no texto em edição ({ id, start, end }): o painel
+  // formata só ele em vez do texto todo. Fica num store, não num estado da
+  // página: muda a cada movimento do cursor, e só o painel precisa saber.
+  const [textSelectionStore] = useState(() => createStore(null))
   const [isPlaying, setIsPlaying] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const imagemInputRef = useRef(null)
@@ -63,7 +78,8 @@ export default function CanvasPage() {
   const [view, setView] = useState({ x: 240, y: 160, zoom: 1 })
   const [painelIcones, setPainelIcones] = useState(true)
   const [painelCamadas, setPainelCamadas] = useState(true)
-  const [coords, setCoords] = useState({ x: 0, y: 0 })
+  // Store pelo mesmo motivo: muda a cada `pointermove` sobre o mapa.
+  const [coordsStore] = useState(() => createStore({ x: 0, y: 0 }))
 
   const [isDirty, setIsDirty] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -439,8 +455,18 @@ export default function CanvasPage() {
 
   useEffect(() => {
     function handleKeyDown(event) {
+      // Salvar vale de qualquer lugar, inclusive no meio da digitação — senão o
+      // Ctrl+S cai no "salvar página" do navegador.
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+        event.preventDefault()
+        save()
+        return
+      }
+
+      // O editor de texto do mapa é um contenteditable, não um campo: sem
+      // essa guarda, Backspace nele apagaria o elemento inteiro.
       const tag = event.target.tagName
-      if (tag === 'INPUT' || tag === 'TEXTAREA') return
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || event.target.isContentEditable) return
 
       if (event.key === 'Escape') {
         setPendingFrom(null)
@@ -459,12 +485,6 @@ export default function CanvasPage() {
           deleteElement(selectedId)
           return
         }
-      }
-
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
-        event.preventDefault()
-        save()
-        return
       }
 
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'd') {
@@ -602,8 +622,9 @@ export default function CanvasPage() {
             onUpdate={updateElement}
             onUpdateMany={updateElements}
             onConnectPick={handleConnectPick}
-            onPointerCoords={setCoords}
+            onPointerCoords={coordsStore.set}
             onDropIcon={adicionarIcone}
+            onTextSelection={textSelectionStore.set}
           />
 
           <div className="canvas-rail">
@@ -655,9 +676,7 @@ export default function CanvasPage() {
           )}
 
           <div className="canvas-status">
-            <span>
-              X {Math.round(coords.x)} · Y {Math.round(coords.y)}
-            </span>
+            <Coordenadas store={coordsStore} />
             <div className="canvas-zoom">
               <button
                 type="button"
@@ -685,6 +704,7 @@ export default function CanvasPage() {
           element={selected}
           connection={selectedConnection}
           elements={elements}
+          textSelectionStore={textSelectionStore}
           isStartScreen={selected?.id === startScreenId}
           capa={project.capa}
           isUploading={isUploading}

@@ -19,8 +19,12 @@ import {
   triggerOf,
 } from './connections.js'
 import { FONT_FAMILIES, measureText, textStyle } from './textMetrics.js'
+import { formatText, replaceText, selectedRange, selectionStyle } from './richText.js'
+import { createStore, useStore } from './store.js'
 
-function NumberField({ label, value, onChange, min, step }) {
+const SEM_SELECAO = createStore(null)
+
+function NumberField({ label, value, onChange, min, step, placeholder }) {
   return (
     <label className="prop-field">
       <span>{label}</span>
@@ -29,6 +33,7 @@ function NumberField({ label, value, onChange, min, step }) {
         value={value}
         min={min}
         step={step}
+        placeholder={placeholder}
         onChange={(event) => {
           const next = Number(event.target.value)
           if (!Number.isNaN(next)) onChange(next)
@@ -55,6 +60,9 @@ function ToggleButton({ active, onClick, label, title, style }) {
     <button
       type="button"
       className={`format-button${active ? ' active' : ''}`}
+      // Sem roubar o foco: com um texto em edição, o trecho selecionado nele
+      // continua selecionado e recebe a formatação.
+      onMouseDown={(event) => event.preventDefault()}
       onClick={onClick}
       aria-pressed={active}
       title={title}
@@ -109,12 +117,18 @@ const ALIGNMENTS = [
   },
 ]
 
-function TextFormatSection({ element, update }) {
+function TextFormatSection({ element, update, faixa, formatar, atual }) {
   const style = textStyle(element)
   const metrics = measureText(element)
+  const { values, mixed } = atual
 
-  const toggle = (key, onValue) =>
-    update({ [key]: style[key] === onValue ? (key === 'textDecoration' ? 'none' : 'normal') : onValue })
+  // Como no Word: se todo o trecho já está assim, desliga; senão (inclusive
+  // misto), liga em tudo.
+  const toggle = (key, onValue) => {
+    const offValue = key === 'textDecoration' ? 'none' : 'normal'
+    formatar({ [key]: !mixed.has(key) && values[key] === onValue ? offValue : onValue })
+  }
+  const ativo = (key, onValue) => !mixed.has(key) && values[key] === onValue
 
   return (
     <>
@@ -125,7 +139,7 @@ function TextFormatSection({ element, update }) {
           <textarea
             className="bio-textarea"
             value={element.text}
-            onChange={(event) => update({ text: event.target.value })}
+            onChange={(event) => update(replaceText(element, event.target.value))}
           />
         </label>
       </section>
@@ -182,13 +196,24 @@ function TextFormatSection({ element, update }) {
       <section className="prop-section">
         <h3>Fonte</h3>
 
+        <p className="prop-hint">
+          {faixa
+            ? `Formatando só os ${faixa.end - faixa.start} caractere(s) selecionado(s).`
+            : 'Vale para o texto todo. Para formatar só uma parte, dê duplo clique no texto e selecione os caracteres.'}
+        </p>
+
         <label className="prop-field">
           <span>Família</span>
           <select
             className="prop-select"
-            value={style.fontFamily}
-            onChange={(event) => update({ fontFamily: event.target.value })}
+            value={mixed.has('fontFamily') ? '' : values.fontFamily}
+            onChange={(event) => formatar({ fontFamily: event.target.value })}
           >
+            {mixed.has('fontFamily') && (
+              <option value="" disabled>
+                Misto
+              </option>
+            )}
             {FONT_FAMILIES.map((font) => (
               <option key={font.value} value={font.value} style={{ fontFamily: font.value }}>
                 {font.label}
@@ -200,9 +225,12 @@ function TextFormatSection({ element, update }) {
         <div className="prop-row">
           <NumberField
             label="Tamanho"
-            value={element.fontSize}
+            value={mixed.has('fontSize') ? '' : values.fontSize}
+            placeholder="Misto"
             min={1}
-            onChange={(fontSize) => update({ fontSize })}
+            onChange={(fontSize) => {
+              if (fontSize > 0) formatar({ fontSize })
+            }}
           />
           <NumberField
             label="Altura da linha"
@@ -217,24 +245,24 @@ function TextFormatSection({ element, update }) {
           <span>Estilo</span>
           <div className="format-group">
             <ToggleButton
-              active={style.fontWeight === 'bold'}
+              active={ativo('fontWeight', 'bold')}
               onClick={() => toggle('fontWeight', 'bold')}
               label="N"
-              title="Negrito"
+              title="Negrito (Ctrl+B)"
               style={{ fontWeight: 700 }}
             />
             <ToggleButton
-              active={style.fontStyle === 'italic'}
+              active={ativo('fontStyle', 'italic')}
               onClick={() => toggle('fontStyle', 'italic')}
               label="I"
-              title="Itálico"
+              title="Itálico (Ctrl+I)"
               style={{ fontStyle: 'italic' }}
             />
             <ToggleButton
-              active={style.textDecoration === 'underline'}
+              active={ativo('textDecoration', 'underline')}
               onClick={() => toggle('textDecoration', 'underline')}
               label="S"
-              title="Sublinhado"
+              title="Sublinhado (Ctrl+U)"
               style={{ textDecoration: 'underline' }}
             />
           </div>
@@ -433,6 +461,7 @@ export default function PropertiesPanel({
   element,
   connection,
   elements = [],
+  textSelectionStore = SEM_SELECAO,
   isStartScreen,
   capa,
   isUploading,
@@ -443,6 +472,8 @@ export default function PropertiesPanel({
   onDeleteConnection,
   onSetStartScreen,
 }) {
+  const textSelection = useStore(textSelectionStore)
+
   if (connection) {
     return (
       <ConnectionSection
@@ -459,6 +490,13 @@ export default function PropertiesPanel({
   }
 
   const update = (patch) => onUpdate(element.id, patch)
+
+  // Formatação de texto: vale para o trecho selecionado no editor do mapa, se
+  // houver um; senão, para o texto todo.
+  const isText = element.type === TOOLS.text
+  const faixa = isText && textSelection?.id === element.id ? selectedRange(element, textSelection) : null
+  const formatar = (patch) => update(formatText(element, faixa, patch))
+  const atual = isText ? selectionStyle(element, faixa) : null
 
   return (
     <aside className="properties-panel">
@@ -559,7 +597,9 @@ export default function PropertiesPanel({
         </section>
       )}
 
-      {element.type === TOOLS.text && <TextFormatSection element={element} update={update} />}
+      {isText && (
+        <TextFormatSection element={element} update={update} faixa={faixa} formatar={formatar} atual={atual} />
+      )}
 
       <section className="prop-section">
         <h3>Aparência</h3>
@@ -567,9 +607,15 @@ export default function PropertiesPanel({
         {/* Imagem não tem preenchimento nem borda: o conteúdo é o próprio arquivo. */}
         {!isImage(element) && (
           <ColorField
-            label={element.type === TOOLS.text ? 'Cor do texto' : isIcon(element) ? 'Cor' : 'Preenchimento'}
-            value={element.fill}
-            onChange={(fill) => update({ fill })}
+            label={
+              isText
+                ? `Cor do texto${atual.mixed.has('fill') ? ' — mista' : ''}`
+                : isIcon(element)
+                  ? 'Cor'
+                  : 'Preenchimento'
+            }
+            value={isText ? atual.values.fill : element.fill}
+            onChange={(fill) => (isText ? formatar({ fill }) : update({ fill }))}
           />
         )}
 

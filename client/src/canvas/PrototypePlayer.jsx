@@ -9,6 +9,7 @@ import {
 } from './connections.js'
 import { composeFrame, createParada, flattenFrame, sameParada } from './playerFrame.js'
 import { easeInOutCubic, mixFrames } from './smartAnimate.js'
+import { onFontsLoaded } from './textMetrics.js'
 import CanvasElement from './CanvasElement.jsx'
 
 /** Rolagem acumulada que conta como gesto (em pixels). */
@@ -126,6 +127,11 @@ export default function PrototypePlayer({
   const first = screens.find((screen) => screen.id === startScreenId) || screens[0]
 
   const [parada, setParada] = useState(() => createParada(first?.id || null))
+
+  // Texto medido antes da web font carregar usou a fonte de reserva: quando
+  // ela chega, redesenha para medir de novo.
+  const [, setFontes] = useState(0)
+  useEffect(() => onFontsLoaded(() => setFontes((versao) => versao + 1)), [])
   // Cada entrada é a parada de onde se saiu e a transição usada — voltar toca
   // a mesma transição ao contrário. `hoverRect` marca a navegação feita
   // "enquanto o mouse estiver em cima": sair desse retângulo desfaz a entrada.

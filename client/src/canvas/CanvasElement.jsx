@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { TOOLS } from './elements.js'
 import { measureText, textStyle, verticalOffset } from './textMetrics.js'
 
@@ -8,7 +9,7 @@ import { measureText, textStyle, verticalOffset } from './textMetrics.js'
  * `hitId` liga a área de clique (usada pelo editor para selecionar e pelo
  * simulador para disparar as conexões); sem ele o elemento é decorativo.
  */
-export default function CanvasElement({ element, hitId = null, hitClassName }) {
+function CanvasElement({ element, hitId = null, hitClassName }) {
   if (element.type === TOOLS.screen) {
     return (
       <rect
@@ -147,24 +148,42 @@ export default function CanvasElement({ element, hitId = null, hitClassName }) {
         height={Math.max(metrics.height, element.fontSize)}
         fill="transparent"
       />
+      {/*
+        Cada linha é uma sequência de trechos com estilo próprio (formatação por
+        caractere). Só o primeiro trecho da linha tem x/y: os seguintes
+        continuam de onde o anterior parou, e a linha inteira forma um bloco só
+        para o `text-anchor` alinhar. A base é a alfabética, posta onde a
+        "pendurada" ficava (`row.baseline`), para letras de tamanhos diferentes
+        dividirem a mesma linha de base. `white-space: pre` mantém os espaços
+        repetidos que a medição conta.
+      */}
       <text
-        fill={element.fill}
-        fontSize={element.fontSize}
-        fontFamily={style.fontFamily}
-        fontWeight={style.fontWeight}
-        fontStyle={style.fontStyle}
-        textDecoration={style.textDecoration}
         textAnchor={anchor}
-        dominantBaseline="hanging"
         pointerEvents="none"
-        style={{ userSelect: 'none' }}
+        style={{ userSelect: 'none', whiteSpace: 'pre' }}
       >
-        {metrics.lines.map((line, index) => (
-          <tspan key={index} x={anchorX} y={element.y + offsetY + index * metrics.lineHeight}>
-            {line}
-          </tspan>
-        ))}
+        {metrics.rows.map((row, rowIndex) =>
+          row.segments.map((segment, index) => (
+            <tspan
+              key={`${rowIndex}:${index}`}
+              x={index === 0 ? anchorX : undefined}
+              y={index === 0 ? element.y + offsetY + row.baseline : undefined}
+              fill={segment.style.fill}
+              fontSize={segment.style.fontSize}
+              fontFamily={segment.style.fontFamily}
+              fontWeight={segment.style.fontWeight}
+              fontStyle={segment.style.fontStyle}
+              textDecoration={segment.style.textDecoration}
+            >
+              {segment.text}
+            </tspan>
+          )),
+        )}
       </text>
     </g>
   )
 }
+
+// Memorizado: digitar num texto cria só aquele objeto de novo, então os outros
+// elementos do mapa nem re-renderizam.
+export default memo(CanvasElement)

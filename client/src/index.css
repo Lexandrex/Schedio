@@ -1266,9 +1266,17 @@ a:hover {
   border-radius: 2px;
   outline: none;
   background: rgb(25 24 26 / 55%);
-  overflow: hidden;
-  resize: none;
+  /* O conteúdo pode passar da caixa (altura fixa menor que o texto), como no
+     mapa — então nada de cortar. */
+  overflow: visible;
   white-space: pre;
+  cursor: text;
+}
+
+/* Seleção do editor de texto quando o foco foi para o painel de propriedades:
+   continua visível enquanto o usuário escolhe cor, fonte ou tamanho. */
+::highlight(schedio-selecao) {
+  background-color: rgb(143 127 212 / 45%);
 }
 
 .canvas-hint {
