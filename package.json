@@ -4,6 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "node server.js",
+    "test": "npm run test:unit && npm run test:api",
+    "test:unit": "node --test \"tests/unit/*.test.mjs\"",
+    "test:api": "node --test \"tests/api/*.test.mjs\"",
     "dev:client": "npm --prefix client run dev",
     "build:client": "npm --prefix client run build",
     "db:migrate": "node scripts/migrate.js",
