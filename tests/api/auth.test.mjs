@@ -9,7 +9,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { emailDeTeste, iniciarAmbiente, CODIGO, SENHA } from '../helpers/ambiente.mjs'
+import { emailDeTeste, iniciarAmbiente, CODIGO, SENHA, TERMOS_VERSAO } from '../helpers/ambiente.mjs'
 
 const amb = await iniciarAmbiente('auth')
 test.after(() => amb.encerrar())
@@ -22,7 +22,7 @@ const contar = async (tabela, email) => {
 test('o cadastro NÃO cria usuário — grava um registro pendente', async () => {
   const email = emailDeTeste('pendente')
 
-  const resposta = await amb.api('/api/auth/register', { method: 'POST', body: { email, password: SENHA } })
+  const resposta = await amb.api('/api/auth/register', { method: 'POST', body: { email, password: SENHA, termsVersion: TERMOS_VERSAO } })
 
   assert.equal(resposta.status, 201)
   assert.equal(await contar('users', email), 0, 'a invariante central')
@@ -31,14 +31,14 @@ test('o cadastro NÃO cria usuário — grava um registro pendente', async () =>
 
 test('o cadastro não emite token — JWT sai só no login', async () => {
   const email = emailDeTeste('sem-token')
-  const resposta = await amb.api('/api/auth/register', { method: 'POST', body: { email, password: SENHA } })
+  const resposta = await amb.api('/api/auth/register', { method: 'POST', body: { email, password: SENHA, termsVersion: TERMOS_VERSAO } })
 
   assert.equal(resposta.body.token, undefined)
 })
 
 test('login antes de confirmar responde "E-mail não cadastrado"', async () => {
   const email = emailDeTeste('nao-confirmado')
-  await amb.api('/api/auth/register', { method: 'POST', body: { email, password: SENHA } })
+  await amb.api('/api/auth/register', { method: 'POST', body: { email, password: SENHA, termsVersion: TERMOS_VERSAO } })
 
   const login = await amb.api('/api/auth/login', { method: 'POST', body: { email, password: SENHA } })
 
@@ -48,7 +48,7 @@ test('login antes de confirmar responde "E-mail não cadastrado"', async () => {
 
 test('código errado não cria o usuário', async () => {
   const email = emailDeTeste('codigo-errado')
-  await amb.api('/api/auth/register', { method: 'POST', body: { email, password: SENHA } })
+  await amb.api('/api/auth/register', { method: 'POST', body: { email, password: SENHA, termsVersion: TERMOS_VERSAO } })
   await amb.forcarCodigo(email)
 
   const resposta = await amb.api('/api/auth/email-verification/verify', {
@@ -63,7 +63,7 @@ test('código errado não cria o usuário', async () => {
 
 test('o código certo cria o usuário e apaga a pendência', async () => {
   const email = emailDeTeste('confirma')
-  await amb.api('/api/auth/register', { method: 'POST', body: { email, password: SENHA } })
+  await amb.api('/api/auth/register', { method: 'POST', body: { email, password: SENHA, termsVersion: TERMOS_VERSAO } })
   await amb.forcarCodigo(email)
 
   const resposta = await amb.api('/api/auth/email-verification/verify', {
@@ -110,7 +110,7 @@ test('e-mail já cadastrado é recusado com 409', async () => {
 
   const resposta = await amb.api('/api/auth/register', {
     method: 'POST',
-    body: { email: conta.email, password: SENHA },
+    body: { email: conta.email, password: SENHA, termsVersion: TERMOS_VERSAO },
   })
 
   assert.equal(resposta.status, 409)
@@ -119,7 +119,7 @@ test('e-mail já cadastrado é recusado com 409', async () => {
 test('senha curta é recusada e nada é gravado', async () => {
   const email = emailDeTeste('senha-curta')
 
-  const resposta = await amb.api('/api/auth/register', { method: 'POST', body: { email, password: '1234' } })
+  const resposta = await amb.api('/api/auth/register', { method: 'POST', body: { email, password: '1234', termsVersion: TERMOS_VERSAO } })
 
   assert.equal(resposta.status, 400)
   assert.equal(await contar('pending_registrations', email), 0)
@@ -127,7 +127,7 @@ test('senha curta é recusada e nada é gravado', async () => {
 
 test('o e-mail é normalizado — caixa e espaços não criam conta diferente', async () => {
   const email = emailDeTeste('normaliza')
-  await amb.api('/api/auth/register', { method: 'POST', body: { email: `  ${email.toUpperCase()} `, password: SENHA } })
+  await amb.api('/api/auth/register', { method: 'POST', body: { email: `  ${email.toUpperCase()} `, password: SENHA, termsVersion: TERMOS_VERSAO } })
   await amb.forcarCodigo(email)
   await amb.api('/api/auth/email-verification/verify', { method: 'POST', body: { email, code: CODIGO } })
 

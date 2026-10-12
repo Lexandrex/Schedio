@@ -25,6 +25,8 @@ import bcrypt from 'bcryptjs'
 import dotenv from 'dotenv'
 import pg from 'pg'
 
+import termos from '../../termos.js'
+
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
 dotenv.config({ path: path.join(RAIZ, '.env') })
 
@@ -34,6 +36,8 @@ const STUB_EMAIL = path.join(RAIZ, 'tests', 'helpers', 'stub-email.cjs')
 /** O código de verificação é forçado no banco — o e-mail de verdade não é lido. */
 export const CODIGO = '111111'
 export const SENHA = 'Senha#Teste1'
+/** Versão vigente dos Termos de Uso — o cadastro só passa aceitando-a. */
+export const TERMOS_VERSAO = termos.TERMOS.versao
 
 function conexao(database) {
   if (process.env.DB_PASSWORD) {
@@ -206,7 +210,7 @@ export async function iniciarAmbiente(sufixo = '') {
    * o código real sai por e-mail e não volta na resposta.
    */
   async function criarConta(email, senha = SENHA) {
-    const registro = await api('/api/auth/register', { method: 'POST', body: { email, password: senha } })
+    const registro = await api('/api/auth/register', { method: 'POST', body: { email, password: senha, termsVersion: TERMOS_VERSAO } })
     if (registro.status !== 201 && registro.status !== 200) {
       throw new Error(`cadastro de ${email} falhou: ${registro.status} ${JSON.stringify(registro.body)}`)
     }
@@ -218,7 +222,7 @@ export async function iniciarAmbiente(sufixo = '') {
     if (confirmacao.status !== 200 && confirmacao.status !== 201) {
       throw new Error(`confirmação de ${email} falhou: ${confirmacao.status} ${JSON.stringify(confirmacao.body)}`)
     }
-    const login = await api('/api/auth/login', { method: 'POST', body: { email, password: senha } })
+    const login = await api('/api/auth/login', { method: 'POST', body: { email, password: senha, termsVersion: TERMOS_VERSAO } })
     if (login.status !== 200) {
       throw new Error(`login de ${email} falhou: ${login.status} ${JSON.stringify(login.body)}`)
     }

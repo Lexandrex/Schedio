@@ -4,6 +4,7 @@ import { apiRequest } from '../api.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import ProfileWorks from '../components/ProfileWorks.jsx'
 import UserIcon from '../components/UserIcon.jsx'
+import TermsDialog from '../components/TermsDialog.jsx'
 
 const DEFAULT_COLOR = '#19181a'
 const BIO_LIMIT = 280
@@ -20,6 +21,8 @@ export default function AccountPage() {
   const [showDeleteForm, setShowDeleteForm] = useState(false)
   const [deletePassword, setDeletePassword] = useState('')
   const [isDeleting, setIsDeleting] = useState(false)
+
+  const [terms, setTerms] = useState(null)
 
   const [projects, setProjects] = useState([])
   const [projectsLoading, setProjectsLoading] = useState(true)
@@ -49,6 +52,14 @@ export default function AccountPage() {
       setFeedback({ message: error.message, type: 'error' })
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  async function openTerms() {
+    try {
+      setTerms(await apiRequest('/api/termos'))
+    } catch (error) {
+      setFeedback({ message: error.message, type: 'error' })
     }
   }
 
@@ -142,6 +153,23 @@ export default function AccountPage() {
             )}
           </section>
 
+          <section className="account-card">
+            <h2>Termos de Uso</h2>
+            <p className="subtitle terms-status">
+              {user.termos_versao ? (
+                <>
+                  Você aceitou a versão <strong>{user.termos_versao}</strong> em{' '}
+                  {formatDateTime(user.termos_aceitos_em)}.
+                </>
+              ) : (
+                <>Esta conta foi criada antes dos Termos de Uso e não tem aceite registrado.</>
+              )}
+            </p>
+            <button className="text-button terms-read" type="button" onClick={openTerms}>
+              Ler os termos vigentes
+            </button>
+          </section>
+
           <section className="account-card account-danger">
             <h2>Excluir conta</h2>
             <p className="subtitle">
@@ -185,6 +213,12 @@ export default function AccountPage() {
           error={projectsError}
         />
       </div>
+
+      {terms && <TermsDialog terms={terms} onClose={() => setTerms(null)} />}
     </div>
   )
+}
+
+function formatDateTime(iso) {
+  return new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
 }

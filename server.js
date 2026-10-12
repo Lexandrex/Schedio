@@ -11,6 +11,7 @@ const { query } = require('./db');
 const { signToken, requireAuth } = require('./auth');
 const storage = require('./storage');
 const { MAX_TAGS_LENGTH, parseTags, formatTags } = require('./tags');
+const { TERMOS } = require('./termos');
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
@@ -71,18 +72,23 @@ async function sendVerificationEmail(email, code) {
   mailPreviewUrl = nodemailer.getTestMessageUrl(result) || null;
 }
 
-async function issuePendingRegistration(email, senhaHash) {
+async function issuePendingRegistration(email, senhaHash, termosVersao) {
   const code = generateEmailCode();
   const codeHash = await bcrypt.hash(code, 10);
+  // O aceite é registrado agora, no momento do cadastro; a confirmação do
+  // e-mail só o copia para `users`.
   await query(
-    `INSERT INTO pending_registrations (email, senha, verification_token_hash, verification_token_expires_at, updated_at)
-     VALUES ($1, $2, $3, NOW() + INTERVAL '15 minutes', NOW())
+    `INSERT INTO pending_registrations
+       (email, senha, verification_token_hash, verification_token_expires_at, termos_versao, termos_aceitos_em, updated_at)
+     VALUES ($1, $2, $3, NOW() + INTERVAL '15 minutes', $4, NOW(), NOW())
      ON CONFLICT (email) DO UPDATE SET
        senha = EXCLUDED.senha,
        verification_token_hash = EXCLUDED.verification_token_hash,
        verification_token_expires_at = EXCLUDED.verification_token_expires_at,
+       termos_versao = EXCLUDED.termos_versao,
+       termos_aceitos_em = EXCLUDED.termos_aceitos_em,
        updated_at = NOW()`,
-    [email, senhaHash, codeHash],
+    [email, senhaHash, codeHash, termosVersao],
   );
   await sendVerificationEmail(email, code);
 }
@@ -140,11 +146,24 @@ app.get('/api/health', async (_request, response, next) => {
   } catch (error) { next(error); }
 });
 
+/** Texto vigente dos Termos de Uso; público porque é lido antes do cadastro. */
+app.get('/api/termos', (_request, response) => {
+  response.json(TERMOS);
+});
+
 app.post('/api/auth/register', async (request, response, next) => {
   try {
-    const { email, password } = request.body;
+    const { email, password, termsVersion } = request.body;
     if (!email || !password || password.length < 8) {
       return response.status(400).json({ message: 'Informe um e-mail válido e uma senha com pelo menos 8 caracteres.' });
+    }
+    if (!termsVersion) {
+      return response.status(400).json({ message: 'É preciso aceitar os Termos de Uso para criar a conta.' });
+    }
+    // Aceite de uma versão antiga (página aberta antes de uma atualização)
+    // não vale: a pessoa precisa ler o texto que de fato será registrado.
+    if (termsVersion !== TERMOS.versao) {
+      return response.status(400).json({ message: 'Os Termos de Uso foram atualizados. Leia a nova versão e aceite novamente.' });
     }
     if (!mailTransport) {
       return response.status(503).json({ message: 'O serviço de e-mail ainda não está configurado. Configure o SMTP para criar uma conta.' });
@@ -157,7 +176,7 @@ app.post('/api/auth/register', async (request, response, next) => {
     }
 
     const senhaHash = await bcrypt.hash(password, 12);
-    await issuePendingRegistration(normalizedEmail, senhaHash);
+    await issuePendingRegistration(normalizedEmail, senhaHash, TERMOS.versao);
 
     return response.status(201).json({
       user: { email: normalizedEmail },
@@ -189,7 +208,10 @@ app.post('/api/auth/login', async (request, response, next) => {
 
 app.get('/api/auth/me', requireAuth, async (request, response, next) => {
   try {
-    const result = await query('SELECT id, email, nome, bio, cor FROM users WHERE id = $1', [request.userId]);
+    const result = await query(
+      'SELECT id, email, nome, bio, cor, termos_versao, termos_aceitos_em FROM users WHERE id = $1',
+      [request.userId],
+    );
     const user = result.rows[0];
     if (!user) return response.status(401).json({ message: 'Sessão inválida ou expirada.' });
     return response.json({ user });
@@ -296,7 +318,9 @@ app.post('/api/auth/email-verification/verify', async (request, response, next) 
     const email = request.body.email?.trim().toLowerCase();
     const code = request.body.code;
     const result = await query(
-      'SELECT senha, verification_token_hash FROM pending_registrations WHERE email = $1 AND verification_token_expires_at > NOW() LIMIT 1',
+      `SELECT senha, verification_token_hash, termos_versao, termos_aceitos_em
+       FROM pending_registrations
+       WHERE email = $1 AND verification_token_expires_at > NOW() LIMIT 1`,
       [email],
     );
     const pending = result.rows[0];
@@ -304,7 +328,11 @@ app.post('/api/auth/email-verification/verify', async (request, response, next) 
       return response.status(400).json({ message: 'Código inválido ou expirado.' });
     }
 
-    await query('INSERT INTO users (email, senha, email_verified_at) VALUES ($1, $2, NOW())', [email, pending.senha]);
+    await query(
+      `INSERT INTO users (email, senha, email_verified_at, termos_versao, termos_aceitos_em)
+       VALUES ($1, $2, NOW(), $3, $4)`,
+      [email, pending.senha, pending.termos_versao, pending.termos_aceitos_em],
+    );
     await query('DELETE FROM pending_registrations WHERE email = $1', [email]);
 
     return response.json({ message: 'E-mail confirmado. Agora você já pode entrar.' });

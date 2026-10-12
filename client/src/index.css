@@ -1713,6 +1713,153 @@ a:hover {
   margin-top: 0;
 }
 
+.primary-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.primary-button:disabled:hover {
+  background: #55535a;
+}
+
+/* Termos de Uso */
+.terms-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 11px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 9px;
+  color: var(--text-secondary);
+  font-size: 0.74rem;
+  line-height: 1.5;
+}
+
+.terms-consent p {
+  margin: 0;
+}
+
+.terms-consent[data-accepted='true'] {
+  border-color: var(--border-strong);
+  color: var(--text-muted);
+}
+
+.terms-check {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  border: 1px solid var(--border-strong);
+  border-radius: 5px;
+  color: #fff;
+  font-size: 0.72rem;
+}
+
+.terms-consent[data-accepted='true'] .terms-check {
+  background: #68636e;
+}
+
+.terms-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #e4dfe9;
+  cursor: pointer;
+  font: inherit;
+  text-decoration: underline;
+}
+
+.terms-link:hover {
+  color: #fff;
+}
+
+.terms-card {
+  display: flex;
+  flex-direction: column;
+  width: min(100%, 640px);
+  max-height: min(86vh, 760px);
+  padding: 26px 26px 0;
+  overflow: hidden;
+}
+
+.terms-header h2 {
+  margin-bottom: 4px;
+}
+
+.terms-meta {
+  margin: 0 0 16px;
+  color: var(--text-secondary);
+  font-size: 0.74rem;
+}
+
+.terms-body {
+  flex: 1;
+  min-height: 0;
+  margin: 0 -26px;
+  padding: 4px 26px 8px;
+  overflow-y: auto;
+  border-top: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color);
+  outline: none;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  line-height: 1.6;
+}
+
+.terms-body h3 {
+  margin: 18px 0 6px;
+  color: #f4f2f5;
+  font-size: 0.86rem;
+  font-weight: 500;
+}
+
+.terms-body p {
+  margin: 0 0 8px;
+}
+
+.terms-actions {
+  padding: 14px 0 16px;
+  margin-top: 0;
+}
+
+.terms-accept {
+  min-width: 150px;
+  margin-top: 0;
+  padding: 0 16px;
+}
+
+.terms-progress {
+  height: 3px;
+  margin: 0 -26px;
+  background: var(--border-color);
+}
+
+.terms-progress span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.2s linear;
+}
+
+.terms-status {
+  margin: 0;
+  text-align: left;
+}
+
+.terms-read {
+  margin-top: 12px;
+  padding: 0;
+}
+
+.account-card h2 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+  font-weight: 500;
+}
+
 /* Account page */
 .account-page {
   min-height: 100vh;

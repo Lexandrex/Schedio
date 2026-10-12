@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useOutletContext } from 'react-router-dom'
 import { authRequest } from '../api.js'
+import TermsDialog from '../components/TermsDialog.jsx'
 
 export default function RegisterPage() {
   const { setFeedback } = useOutletContext()
@@ -8,6 +9,30 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmation, setConfirmation] = useState('')
+  const [terms, setTerms] = useState(null)
+  const [showTerms, setShowTerms] = useState(false)
+  // Versão aceita, e não um booleano: é ela que vai para o servidor e fica
+  // registrada, então precisa ser a versão do texto que estava na tela.
+  const [acceptedVersion, setAcceptedVersion] = useState(null)
+
+  async function openTerms() {
+    try {
+      // Sempre relê: se o texto mudou desde a última abertura, é o novo que vale.
+      const response = await fetch('/api/termos')
+      if (!response.ok) throw new Error()
+      const data = await response.json()
+      if (acceptedVersion && acceptedVersion !== data.versao) setAcceptedVersion(null)
+      setTerms(data)
+      setShowTerms(true)
+    } catch {
+      setFeedback({ message: 'Não foi possível carregar os Termos de Uso. Tente novamente.', type: 'error' })
+    }
+  }
+
+  function handleAccept() {
+    setAcceptedVersion(terms.versao)
+    setShowTerms(false)
+  }
 
   async function handleSubmit(event) {
     event.preventDefault()
@@ -16,13 +41,19 @@ export default function RegisterPage() {
       setFeedback({ message: 'As senhas informadas não coincidem.', type: 'error' })
       return
     }
+    if (!acceptedVersion) {
+      setFeedback({ message: 'Leia e aceite os Termos de Uso para criar a conta.', type: 'error' })
+      return
+    }
 
     try {
-      const data = await authRequest('register', { email, password })
+      const data = await authRequest('register', { email, password, termsVersion: acceptedVersion })
       navigate('/verify-email', {
         state: { email: data.user.email, feedback: data.message, feedbackType: 'success' },
       })
     } catch (error) {
+      // O servidor recusa versão desatualizada: obriga a ler a nova.
+      setAcceptedVersion(null)
       setFeedback({ message: error.message, type: 'error' })
     }
   }
@@ -79,10 +110,34 @@ export default function RegisterPage() {
           />
         </label>
 
-        <button className="primary-button" type="submit">
+        <div className="terms-consent" data-accepted={acceptedVersion ? 'true' : 'false'}>
+          <span className="terms-check" aria-hidden="true">{acceptedVersion ? '✓' : ''}</span>
+          <p>
+            {acceptedVersion ? (
+              <>Você aceitou os </>
+            ) : (
+              <>Para criar a conta, leia e aceite os </>
+            )}
+            <button className="terms-link" type="button" onClick={openTerms}>
+              Termos de Uso e Política de Privacidade
+            </button>
+            {acceptedVersion && <> (versão {acceptedVersion})</>}.
+          </p>
+        </div>
+
+        <button
+          className="primary-button"
+          type="submit"
+          disabled={!acceptedVersion}
+          title={acceptedVersion ? undefined : 'Aceite os Termos de Uso para continuar'}
+        >
           Criar conta
         </button>
       </form>
+
+      {showTerms && (
+        <TermsDialog terms={terms} onAccept={handleAccept} onClose={() => setShowTerms(false)} />
+      )}
     </div>
   )
 }
