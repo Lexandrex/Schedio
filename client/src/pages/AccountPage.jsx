@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext.jsx'
 import ProfileWorks from '../components/ProfileWorks.jsx'
 import UserIcon from '../components/UserIcon.jsx'
 import TermsDialog from '../components/TermsDialog.jsx'
+import ReportedProjects from '../components/ReportedProjects.jsx'
 
 const DEFAULT_COLOR = '#19181a'
 const BIO_LIMIT = 280
@@ -152,6 +153,8 @@ export default function AccountPage() {
               </p>
             )}
           </section>
+
+          <ReportedProjects />
 
           <section className="account-card">
             <h2>Termos de Uso</h2>

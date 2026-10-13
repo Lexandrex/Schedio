@@ -255,7 +255,18 @@ app.delete('/api/users/me', requireAuth, async (request, response, next) => {
       return response.status(401).json({ message: 'Senha incorreta.' });
     }
 
-    await query('DELETE FROM users WHERE id = $1', [request.userId]);
+    // Os likes da conta saem junto com ela. Os projetos do próprio usuário
+    // ficam de fora porque o cascade já os apaga no mesmo comando. As
+    // denúncias, não: o contador só cresce e serve à avaliação (RN-15).
+    await query(
+      `WITH descurtidos AS (
+         UPDATE projetos SET likes = GREATEST(likes - 1, 0)
+         WHERE usuario_id <> $1
+           AND id::text IN (SELECT jsonb_array_elements_text(likes) FROM users WHERE id = $1)
+       )
+       DELETE FROM users WHERE id = $1`,
+      [request.userId],
+    );
     return response.status(204).send();
   } catch (error) { return next(error); }
 });
@@ -342,15 +353,19 @@ app.post('/api/auth/email-verification/verify', async (request, response, next) 
   }
 });
 
-app.get('/api/projects', requireAuth, async (_request, response, next) => {
+app.get('/api/projects', requireAuth, async (request, response, next) => {
   try {
+    // `salvo` diz se quem pede guardou o projeto: a tela inicial os põe em destaque.
     const result = await query(
       `SELECT p.id, p.titulo, p.categoria, p.capa, p.criado, p.likes,
-              u.id AS autor_id, u.nome AS autor_nome, u.email AS autor_email
+              u.id AS autor_id, u.nome AS autor_nome, u.email AS autor_email,
+              COALESCE(eu.salvos ? p.id::text, false) AS salvo
        FROM projetos p
        JOIN users u ON u.id = p.usuario_id
+       LEFT JOIN users eu ON eu.id = $1
        WHERE p.status = 'publicado'
        ORDER BY p.criado DESC`,
+      [request.userId],
     );
     return response.json({ projects: result.rows });
   } catch (error) { return next(error); }
@@ -474,13 +489,19 @@ app.patch('/api/projects/:id', requireAuth, async (request, response, next) => {
  */
 app.get('/api/projects/:id/leitura', requireAuth, async (request, response, next) => {
   try {
+    // `curtido`, `salvo` e `denunciado` são de quem lê, para a apresentação
+    // mostrar os botões já no estado certo.
     const result = await query(
       `SELECT p.id, p.titulo, p.descricao, p.categoria, p.capa, p.criado, p.likes, p.conteudo,
-              u.id AS autor_id, u.nome AS autor_nome, u.email AS autor_email, u.bio AS autor_bio
+              u.id AS autor_id, u.nome AS autor_nome, u.email AS autor_email, u.bio AS autor_bio,
+              COALESCE(eu.likes ? p.id::text, false) AS curtido,
+              COALESCE(eu.salvos ? p.id::text, false) AS salvo,
+              COALESCE(eu.reportados ? p.id::text, false) AS denunciado
        FROM projetos p
        JOIN users u ON u.id = p.usuario_id
+       LEFT JOIN users eu ON eu.id = $2
        WHERE p.id = $1 AND p.status = 'publicado'`,
-      [request.params.id],
+      [request.params.id, request.userId],
     );
     if (!result.rows[0]) {
       return response.status(404).json({ message: 'Projeto não encontrado ou não publicado.' });
@@ -490,6 +511,101 @@ app.get('/api/projects/:id/leitura', requireAuth, async (request, response, next
     if (error.code === '22P02') return response.status(404).json({ message: 'Projeto não encontrado ou não publicado.' });
     return next(error);
   }
+});
+
+/**
+ * Curtir, salvar e denunciar (RF-38, RF-40, RF-39).
+ *
+ * A marca mora no array de `users` (`likes`, `salvos`, `reportados`, com o id
+ * do projeto em texto) e o contador, quando há, em `projetos`. Marcar e
+ * contar vão num único comando: o UPDATE em `users` só acontece se o id ainda
+ * não estava (ou ainda estava) no array, e o contador anda pelo número de
+ * linhas que ele de fato mudou. Dois cliques simultâneos do mesmo usuário
+ * esbarram na trava da linha dele, e o segundo já não muda nada — RN-14, um
+ * like por usuário, sem depender de checagem antes do UPDATE.
+ *
+ * Marcar exige projeto publicado (é o que o leitor alcança); desmarcar só
+ * exige que ele exista, para quem curtiu não ficar preso se o dono o tornou
+ * privado.
+ */
+const MARCAS = {
+  like: { lista: 'likes', contador: 'likes' },
+  salvo: { lista: 'salvos', contador: null },
+  denuncia: { lista: 'reportados', contador: 'denuncias' },
+};
+
+async function alterarMarca(tipo, request, response, marcar) {
+  const { lista, contador } = MARCAS[tipo];
+  const projectId = request.params.id;
+
+  const projeto = await query('SELECT usuario_id, status FROM projetos WHERE id = $1', [projectId]);
+  const alvo = projeto.rows[0];
+  if (!alvo || (marcar && alvo.status !== 'publicado')) {
+    response.status(404).json({ message: 'Projeto não encontrado ou não publicado.' });
+    return null;
+  }
+  if (tipo === 'denuncia' && alvo.usuario_id === request.userId) {
+    response.status(400).json({ message: 'Você não pode denunciar o próprio projeto.' });
+    return null;
+  }
+
+  const mudanca = marcar
+    ? `${lista} = ${lista} || to_jsonb($1::uuid::text) WHERE id = $2 AND NOT ${lista} ? $1::uuid::text`
+    : `${lista} = ${lista} - $1::uuid::text WHERE id = $2 AND ${lista} ? $1::uuid::text`;
+  const passo = marcar ? '+' : '-';
+
+  const result = await query(
+    `WITH mudou AS (UPDATE users SET ${mudanca} RETURNING id)
+     ${contador
+       ? `UPDATE projetos SET ${contador} = GREATEST(${contador} ${passo} (SELECT COUNT(*) FROM mudou)::int, 0)
+          WHERE id = $1::uuid RETURNING ${contador} AS total`
+       : 'SELECT COUNT(*)::int AS total FROM mudou'}`,
+    [projectId, request.userId],
+  );
+  return result.rows[0] || { total: 0 };
+}
+
+/** Rota de marca: trata o UUID inválido como 404, igual às demais rotas de projeto. */
+function rotaDeMarca(tipo, marcar, responder) {
+  return async (request, response, next) => {
+    try {
+      const resultado = await alterarMarca(tipo, request, response, marcar);
+      if (resultado) response.json(responder(resultado));
+    } catch (error) {
+      if (error.code === '22P02') return response.status(404).json({ message: 'Projeto não encontrado ou não publicado.' });
+      return next(error);
+    }
+  };
+}
+
+app.put('/api/projects/:id/like', requireAuth, rotaDeMarca('like', true, ({ total }) => ({ curtido: true, likes: total })));
+app.delete('/api/projects/:id/like', requireAuth, rotaDeMarca('like', false, ({ total }) => ({ curtido: false, likes: total })));
+app.put('/api/projects/:id/salvo', requireAuth, rotaDeMarca('salvo', true, () => ({ salvo: true })));
+app.delete('/api/projects/:id/salvo', requireAuth, rotaDeMarca('salvo', false, () => ({ salvo: false })));
+// Denúncia não se desfaz: o contador só cresce e fica para a avaliação (RN-15).
+// Por isso também não devolvemos o total a quem denuncia.
+app.post('/api/projects/:id/denuncia', requireAuth, rotaDeMarca('denuncia', true, () => ({ denunciado: true })));
+
+/**
+ * Projetos que o usuário denunciou, do mais recente para o mais antigo (a
+ * ordem do array). Os que voltaram a ser privados continuam na lista, com o
+ * status, mas a interface não os abre — a leitura não alcança projeto privado.
+ */
+app.get('/api/users/me/denuncias', requireAuth, async (request, response, next) => {
+  try {
+    const result = await query(
+      `SELECT p.id, p.titulo, p.capa, p.status, p.criado,
+              u.id AS autor_id, u.nome AS autor_nome, u.email AS autor_email
+       FROM users eu
+       CROSS JOIN LATERAL jsonb_array_elements_text(eu.reportados) WITH ORDINALITY AS r(projeto_id, ordem)
+       JOIN projetos p ON p.id::text = r.projeto_id
+       JOIN users u ON u.id = p.usuario_id
+       WHERE eu.id = $1
+       ORDER BY r.ordem DESC`,
+      [request.userId],
+    );
+    return response.json({ projects: result.rows });
+  } catch (error) { return next(error); }
 });
 
 app.patch('/api/projects/:id/status', requireAuth, async (request, response, next) => {
@@ -672,6 +788,14 @@ app.delete('/api/projects/:id', requireAuth, async (request, response, next) => 
     if (!result.rowCount) {
       return response.status(404).json({ message: 'Projeto não encontrado.' });
     }
+
+    // Os arrays de `users` guardam o id em texto, sem FK: o cascade não os alcança.
+    await query(
+      `UPDATE users
+       SET likes = likes - $1::uuid::text, salvos = salvos - $1::uuid::text, reportados = reportados - $1::uuid::text
+       WHERE likes ? $1::uuid::text OR salvos ? $1::uuid::text OR reportados ? $1::uuid::text`,
+      [request.params.id],
+    );
 
     // Best-effort: o projeto já foi excluído, uma falha aqui não deve virar erro para o usuário.
     if (storage.isConfigured && aRemover.rows[0]) {

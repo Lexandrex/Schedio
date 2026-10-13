@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useProjectFilter } from '../projectFilter.js'
 import { parseTags } from '../tags.js'
+import { LikeCount } from './InteractionIcons.jsx'
 
 // No perfil o autor é sempre o mesmo, então a pesquisa olha título e tags.
 function searchFields(project) {
@@ -82,6 +83,8 @@ export default function ProfileWorks({ projects, isOwner, isLoading, error }) {
               <p className="project-author">
                 {new Date(project.criado).toLocaleDateString('pt-BR')}
               </p>
+              {/* Os likes ficam com o projeto: o dono os vê mesmo depois de privá-lo. */}
+              <LikeCount likes={project.likes} />
             </Link>
           )
         })}

@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { apiRequest } from '../api.js'
 import AccountMenu from '../components/AccountMenu.jsx'
 import TrashIcon from '../components/TrashIcon.jsx'
+import { LikeCount } from '../components/InteractionIcons.jsx'
 import { MAX_TAGS_LENGTH, TAGS_HINT, formatTags, parseTags } from '../tags.js'
 
 const STATUS_LABEL = {
@@ -221,6 +222,8 @@ export default function EditorPage() {
                 <span className={`status-chip status-chip--${project.status}`}>
                   {STATUS_LABEL[project.status] || project.status}
                 </span>
+                {/* Privado ou não, o dono continua vendo os likes que a obra recebeu. */}
+                <LikeCount likes={project.likes} />
                 {project.id === selectedId && (
                   <div className="editor-card-actions">
                     <button

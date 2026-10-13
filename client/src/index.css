@@ -792,6 +792,231 @@ a:hover {
   font-size: 0.74rem;
 }
 
+/* Salvar, like e denunciar, na apresentação do projeto */
+.detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.detail-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 13px;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.76rem;
+  transition: background 0.18s, color 0.18s, border-color 0.18s;
+}
+
+.detail-action:hover:not(:disabled) {
+  background: var(--bg-input);
+  border-color: var(--border-strong);
+  color: #fff;
+}
+
+.detail-action:disabled {
+  cursor: not-allowed;
+}
+
+.detail-action.active {
+  border-color: var(--border-strong);
+  background: var(--bg-input);
+  color: #fff;
+}
+
+.detail-action--like.active {
+  border-color: #8a4b5c;
+  background: #48303a;
+  color: #f6c4d2;
+}
+
+.detail-action--report:disabled:not(.active) {
+  opacity: 0.5;
+}
+
+.detail-action--report.active {
+  border-color: #7a4646;
+  background: #4a2f31;
+  color: #f4d9d9;
+}
+
+.detail-action-count {
+  padding-left: 7px;
+  border-left: 1px solid currentColor;
+  font-variant-numeric: tabular-nums;
+}
+
+.detail-like-hint {
+  color: #f6c4d2;
+}
+
+.detail-report-confirm {
+  margin-top: 14px;
+  padding: 14px 16px;
+  border: 1px solid #7a4646;
+  border-radius: 10px;
+  background: rgb(74 47 49 / 45%);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.detail-report-confirm p {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.detail-report-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+/* Tela inicial: salvos no topo, em destaque, e a comunidade logo abaixo */
+.home-section + .home-section {
+  margin-top: 34px;
+}
+
+.home-section-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 7px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-panel);
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
+.home-section--saved {
+  padding: 18px;
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  background: rgb(55 52 56 / 55%);
+}
+
+.home-section--saved .home-section-title {
+  border-color: var(--border-strong);
+  background: var(--bg-input);
+  color: #fff;
+}
+
+.project-card--saved .project-cover {
+  border-color: var(--border-strong);
+  box-shadow: 0 10px 26px rgb(0 0 0 / 30%);
+}
+
+.project-likes {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Conta: aba dos projetos denunciados */
+.reported-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.reported-card .reported-toggle h2 {
+  margin: 0;
+}
+
+.reported-toggle:hover h2 {
+  color: #fff;
+}
+
+.reported-chevron {
+  margin-left: auto;
+  color: var(--text-secondary);
+  transition: transform 0.18s;
+}
+
+.reported-chevron.open {
+  transform: rotate(180deg);
+}
+
+.reported-body {
+  margin-top: 16px;
+}
+
+.reported-list {
+  display: grid;
+  gap: 8px;
+  max-height: 320px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.reported-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  color: inherit;
+  text-decoration: none;
+}
+
+a.reported-item:hover {
+  border-color: var(--border-strong);
+  background: var(--bg-input);
+}
+
+.reported-cover {
+  flex-shrink: 0;
+  width: 36px;
+  aspect-ratio: 3 / 4;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background: linear-gradient(160deg, #4a4551, #26232b) center / cover no-repeat;
+}
+
+.reported-info {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+
+.reported-title {
+  overflow: hidden;
+  font-size: 0.82rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reported-author {
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+}
+
 /* Canvas / editor de projeto */
 .canvas-page {
   display: flex;
