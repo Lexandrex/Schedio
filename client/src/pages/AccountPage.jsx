@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { apiRequest } from '../api.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import ProfileWorks from '../components/ProfileWorks.jsx'
-import UserIcon from '../components/UserIcon.jsx'
+import ProfilePhotoField from '../components/ProfilePhotoField.jsx'
 import TermsDialog from '../components/TermsDialog.jsx'
 import ReportedProjects from '../components/ReportedProjects.jsx'
 
@@ -96,9 +96,11 @@ export default function AccountPage() {
         <div className="account-layout">
           <section className="account-card">
             <div className="account-profile-row">
-              <span className="account-avatar" aria-hidden="true">
-                <UserIcon size={34} />
-              </span>
+              <ProfilePhotoField
+                foto={user.foto}
+                onChange={(foto) => updateUser({ foto })}
+                onFeedback={setFeedback}
+              />
               <div>
                 <h1>{user.nome || user.email}</h1>
                 <p className="subtitle">{user.email}</p>
