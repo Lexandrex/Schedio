@@ -69,7 +69,8 @@ test('o dono vê todas as obras, com o status de cada uma', async () => {
 test('o perfil não vaza a senha do criador', async () => {
   const { body } = await amb.api(`/api/users/${criador.id}/perfil`, { token: visitante.token })
 
-  assert.deepEqual(Object.keys(body.user).sort(), ['bio', 'email', 'foto', 'id', 'nome'])
+  // `denunciado` é de quem visita; o total de denúncias (`users.denuncias`) não sai daqui.
+  assert.deepEqual(Object.keys(body.user).sort(), ['bio', 'denunciado', 'email', 'foto', 'id', 'nome'])
 })
 
 test('perfil inexistente responde 404', async () => {

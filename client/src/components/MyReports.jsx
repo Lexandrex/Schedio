@@ -1,28 +1,32 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { apiRequest } from '../api.js'
+import Avatar from './Avatar.jsx'
 import { AlertIcon } from './InteractionIcons.jsx'
 
 /**
- * Aba da conta com os projetos que o usuário denunciou, do mais recente ao
- * mais antigo. Começa fechada (é consulta, não tarefa) e mostra o total no
- * cabeçalho para dizer se vale abrir.
+ * Aba da conta com o que o usuário denunciou — projetos e criadores, cada
+ * grupo do mais recente ao mais antigo. Começa fechada (é consulta, não
+ * tarefa) e mostra o total no cabeçalho para dizer se vale abrir.
  *
  * A denúncia não se desfaz, então a lista é só de leitura. Um projeto que
  * voltou a ser privado continua nela, mas sem link: a leitura não o abre.
  */
-export default function ReportedProjects() {
-  const [projects, setProjects] = useState([])
+export default function MyReports() {
+  const [reports, setReports] = useState({ projects: [], creators: [] })
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [isOpen, setIsOpen] = useState(false)
 
   useEffect(() => {
     apiRequest('/api/users/me/denuncias')
-      .then((data) => setProjects(data.projects))
+      .then((data) => setReports({ projects: data.projects, creators: data.creators }))
       .catch((requestError) => setError(requestError.message))
       .finally(() => setIsLoading(false))
   }, [])
+
+  const { projects, creators } = reports
+  const total = projects.length + creators.length
 
   return (
     <section className="account-card reported-card">
@@ -34,8 +38,8 @@ export default function ReportedProjects() {
         onClick={() => setIsOpen((open) => !open)}
       >
         <AlertIcon size={17} />
-        <h2>Projetos denunciados</h2>
-        {!isLoading && !error && <span className="profile-works-count">{projects.length}</span>}
+        <h2>Denúncias feitas</h2>
+        {!isLoading && !error && <span className="profile-works-count">{total}</span>}
         <span className={`reported-chevron${isOpen ? ' open' : ''}`} aria-hidden="true">
           ▾
         </span>
@@ -45,19 +49,37 @@ export default function ReportedProjects() {
         <div id="reported-list" className="reported-body">
           {isLoading && <p className="subtitle">Carregando...</p>}
           {error && <p className="home-status home-status--error">{error}</p>}
-          {!isLoading && !error && projects.length === 0 && (
+          {!isLoading && !error && total === 0 && (
             <p className="subtitle">
-              Você ainda não denunciou nenhum projeto. Para denunciar, use o botão Denunciar na
-              apresentação da obra.
+              Você ainda não fez nenhuma denúncia. Projetos se denunciam na apresentação da obra, e
+              criadores, no perfil deles.
             </p>
           )}
 
           {projects.length > 0 && (
-            <ul className="reported-list">
+            <ReportGroup title="Projetos" count={projects.length}>
               {projects.map((project) => (
-                <ReportedItem key={project.id} project={project} />
+                <ReportedProject key={project.id} project={project} />
               ))}
-            </ul>
+            </ReportGroup>
+          )}
+
+          {creators.length > 0 && (
+            <ReportGroup title="Criadores" count={creators.length}>
+              {creators.map((creator) => (
+                <li key={creator.id}>
+                  <Link className="reported-item" to={`/perfil/${creator.id}`}>
+                    <span className="reported-avatar" aria-hidden="true">
+                      <Avatar foto={creator.foto} size={18} />
+                    </span>
+                    <span className="reported-info">
+                      <span className="reported-title">{creator.nome || creator.email}</span>
+                      <span className="reported-author">Criador</span>
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ReportGroup>
           )}
         </div>
       )}
@@ -65,7 +87,18 @@ export default function ReportedProjects() {
   )
 }
 
-function ReportedItem({ project }) {
+function ReportGroup({ title, count, children }) {
+  return (
+    <div className="reported-group">
+      <h3 className="reported-group-title">
+        {title} <span className="profile-works-count">{count}</span>
+      </h3>
+      <ul className="reported-list">{children}</ul>
+    </div>
+  )
+}
+
+function ReportedProject({ project }) {
   const isPublished = project.status === 'publicado'
   const content = (
     <>

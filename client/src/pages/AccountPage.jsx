@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext.jsx'
 import ProfileWorks from '../components/ProfileWorks.jsx'
 import ProfilePhotoField from '../components/ProfilePhotoField.jsx'
 import TermsDialog from '../components/TermsDialog.jsx'
-import ReportedProjects from '../components/ReportedProjects.jsx'
+import MyReports from '../components/MyReports.jsx'
 
 const DEFAULT_COLOR = '#19181a'
 const BIO_LIMIT = 280
@@ -24,6 +24,7 @@ export default function AccountPage() {
   const [isDeleting, setIsDeleting] = useState(false)
 
   const [terms, setTerms] = useState(null)
+  const [retention, setRetention] = useState(null)
 
   const [projects, setProjects] = useState([])
   const [projectsLoading, setProjectsLoading] = useState(true)
@@ -53,6 +54,19 @@ export default function AccountPage() {
       setFeedback({ message: error.message, type: 'error' })
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  // O prazo de guarda vem dos Termos (fonte única no servidor), lido só
+  // quando a pessoa decide excluir. Sem ele o aviso some, mas a exclusão segue.
+  async function openDeleteForm() {
+    setShowDeleteForm(true)
+    if (retention !== null) return
+    try {
+      const data = await apiRequest('/api/termos')
+      setRetention(data.retencaoContaExcluidaMeses)
+    } catch {
+      // O aviso é informativo; o texto completo continua em "Ler os termos vigentes".
     }
   }
 
@@ -156,7 +170,7 @@ export default function AccountPage() {
             )}
           </section>
 
-          <ReportedProjects />
+          <MyReports />
 
           <section className="account-card">
             <h2>Termos de Uso</h2>
@@ -181,8 +195,16 @@ export default function AccountPage() {
               Essa ação é permanente e remove seus dados e projetos da plataforma.
             </p>
 
+            {showDeleteForm && retention !== null && (
+              <p className="subtitle account-retention">
+                Como descrito nos Termos de Uso, uma cópia dos seus projetos fica guardada, sem
+                acesso pela plataforma, por até <strong>{retention} meses</strong> para apuração
+                de denúncias, e depois é apagada definitivamente.
+              </p>
+            )}
+
             {!showDeleteForm ? (
-              <button className="danger-button" type="button" onClick={() => setShowDeleteForm(true)}>
+              <button className="danger-button" type="button" onClick={openDeleteForm}>
                 Excluir conta
               </button>
             ) : (

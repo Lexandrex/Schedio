@@ -7,11 +7,12 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const multer = require('multer');
-const { query } = require('./db');
+const { query, pool } = require('./db');
 const { signToken, requireAuth } = require('./auth');
 const storage = require('./storage');
 const { MAX_TAGS_LENGTH, parseTags, formatTags } = require('./tags');
 const { TERMOS } = require('./termos');
+const { arquivarConta, expurgarContasVencidas } = require('./contasExcluidas');
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
@@ -255,18 +256,47 @@ app.delete('/api/users/me', requireAuth, async (request, response, next) => {
       return response.status(401).json({ message: 'Senha incorreta.' });
     }
 
-    // Os likes da conta saem junto com ela. Os projetos do próprio usuário
-    // ficam de fora porque o cascade já os apaga no mesmo comando. As
-    // denúncias, não: o contador só cresce e serve à avaliação (RN-15).
-    await query(
-      `WITH descurtidos AS (
-         UPDATE projetos SET likes = GREATEST(likes - 1, 0)
+    // Tudo numa transação: a cópia para `contas_excluidas` (prazo dos Termos)
+    // e a exclusão acontecem juntas ou nenhuma. Ver contasExcluidas.js.
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await arquivarConta(client, request.userId);
+
+      // Os likes da conta saem junto com ela. Os projetos do próprio usuário
+      // ficam de fora porque o cascade já os apaga. As denúncias, não: o
+      // contador só cresce e serve à avaliação (RN-15).
+      await client.query(
+        `UPDATE projetos SET likes = GREATEST(likes - 1, 0)
          WHERE usuario_id <> $1
-           AND id::text IN (SELECT jsonb_array_elements_text(likes) FROM users WHERE id = $1)
-       )
-       DELETE FROM users WHERE id = $1`,
-      [request.userId],
-    );
+           AND id::text IN (SELECT jsonb_array_elements_text(likes) FROM users WHERE id = $1)`,
+        [request.userId],
+      );
+
+      // Os arrays de `users` não têm FK: o cascade não tira deles os projetos
+      // desta conta nem a própria conta, como acontece ao excluir um projeto.
+      await client.query(
+        `WITH sumidos AS (SELECT ARRAY(SELECT id::text FROM projetos WHERE usuario_id = $1) AS ids)
+         UPDATE users
+         SET likes = likes - sumidos.ids,
+             salvos = salvos - sumidos.ids,
+             reportados = reportados - sumidos.ids,
+             criadores_reportados = criadores_reportados - $1::uuid::text
+         FROM sumidos
+         WHERE users.id <> $1
+           AND (likes ?| sumidos.ids OR salvos ?| sumidos.ids OR reportados ?| sumidos.ids
+             OR criadores_reportados ? $1::uuid::text)`,
+        [request.userId],
+      );
+
+      await client.query('DELETE FROM users WHERE id = $1', [request.userId]);
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
 
     // Best-effort, como na exclusão de projeto: a conta já se foi.
     if (storage.isConfigured && user.foto_public_id) {
@@ -285,9 +315,14 @@ app.delete('/api/users/me', requireAuth, async (request, response, next) => {
  */
 app.get('/api/users/:id/perfil', requireAuth, async (request, response, next) => {
   try {
+    // `denunciado` é de quem visita: o botão de denunciar já abre no estado certo.
     const userResult = await query(
-      'SELECT id, nome, email, bio, foto FROM users WHERE id = $1',
-      [request.params.id],
+      `SELECT u.id, u.nome, u.email, u.bio, u.foto,
+              COALESCE(eu.criadores_reportados ? u.id::text, false) AS denunciado
+       FROM users u
+       LEFT JOIN users eu ON eu.id = $2
+       WHERE u.id = $1`,
+      [request.params.id, request.userId],
     );
     const user = userResult.rows[0];
     if (!user) return response.status(404).json({ message: 'Perfil não encontrado.' });
@@ -592,12 +627,70 @@ app.delete('/api/projects/:id/salvo', requireAuth, rotaDeMarca('salvo', false, (
 app.post('/api/projects/:id/denuncia', requireAuth, rotaDeMarca('denuncia', true, () => ({ denunciado: true })));
 
 /**
- * Projetos que o usuário denunciou, do mais recente para o mais antigo (a
- * ordem do array). Os que voltaram a ser privados continuam na lista, com o
- * status, mas a interface não os abre — a leitura não alcança projeto privado.
+ * Denúncia de criador, no mesmo molde da de projeto: a marca vai para
+ * `criadores_reportados` de quem denuncia e o total, que só cresce, para a
+ * conta denunciada — num comando só, pelo número de linhas que a marca mudou.
+ *
+ * Os dois UPDATEs travam duas linhas de `users`. Se A denuncia B enquanto B
+ * denuncia A, cada comando pega uma trava e espera a outra; o Postgres desfaz
+ * um deles (40P01) e ele é repetido uma vez.
+ */
+async function denunciarCriador(reporterId, creatorId) {
+  return query(
+    `WITH mudou AS (
+       UPDATE users SET criadores_reportados = criadores_reportados || to_jsonb($1::uuid::text)
+       WHERE id = $2 AND NOT criadores_reportados ? $1::uuid::text
+         AND EXISTS (SELECT 1 FROM users WHERE id = $1::uuid)
+       RETURNING id
+     )
+     UPDATE users SET denuncias = denuncias + (SELECT COUNT(*) FROM mudou)::int
+     WHERE id = $1::uuid
+     RETURNING id`,
+    [creatorId, reporterId],
+  );
+}
+
+app.post('/api/users/:id/denuncia', requireAuth, async (request, response, next) => {
+  try {
+    if (request.params.id === request.userId) {
+      return response.status(400).json({ message: 'Você não pode denunciar a si mesmo.' });
+    }
+
+    let result;
+    try {
+      result = await denunciarCriador(request.userId, request.params.id);
+    } catch (error) {
+      if (error.code !== '40P01') throw error;
+      result = await denunciarCriador(request.userId, request.params.id);
+    }
+
+    if (!result.rowCount) return response.status(404).json({ message: 'Perfil não encontrado.' });
+    // Como na denúncia de projeto, o total não volta para quem denuncia.
+    return response.json({ denunciado: true });
+  } catch (error) {
+    if (error.code === '22P02') return response.status(404).json({ message: 'Perfil não encontrado.' });
+    return next(error);
+  }
+});
+
+/**
+ * O que o usuário denunciou, do mais recente para o mais antigo (a ordem dos
+ * arrays): projetos e criadores. Os projetos que voltaram a ser privados
+ * continuam na lista, com o status, mas a interface não os abre — a leitura
+ * não alcança projeto privado. Criadores que excluíram a conta somem: a
+ * exclusão os tira dos arrays.
  */
 app.get('/api/users/me/denuncias', requireAuth, async (request, response, next) => {
   try {
+    const creators = await query(
+      `SELECT u.id, u.nome, u.email, u.foto
+       FROM users eu
+       CROSS JOIN LATERAL jsonb_array_elements_text(eu.criadores_reportados) WITH ORDINALITY AS r(criador_id, ordem)
+       JOIN users u ON u.id::text = r.criador_id
+       WHERE eu.id = $1
+       ORDER BY r.ordem DESC`,
+      [request.userId],
+    );
     const result = await query(
       `SELECT p.id, p.titulo, p.capa, p.status, p.criado,
               u.id AS autor_id, u.nome AS autor_nome, u.email AS autor_email
@@ -609,7 +702,7 @@ app.get('/api/users/me/denuncias', requireAuth, async (request, response, next) 
        ORDER BY r.ordem DESC`,
       [request.userId],
     );
-    return response.json({ projects: result.rows });
+    return response.json({ projects: result.rows, creators: creators.rows });
   } catch (error) { return next(error); }
 });
 
@@ -983,6 +1076,22 @@ app.use((error, _request, response, _next) => {
   console.error(error);
   response.status(500).json({ message: 'Não foi possível concluir a operação. Tente novamente.' });
 });
+
+/**
+ * Expurgo das contas excluídas vencidas: na subida e uma vez por dia. O
+ * `unref` não deixa o timer segurar o processo de pé. Também roda à mão com
+ * `npm run contas:expurgar`.
+ */
+const UM_DIA_MS = 24 * 60 * 60 * 1000;
+
+function expurgar() {
+  expurgarContasVencidas({ query, storage })
+    .then(({ contas }) => contas && console.log(`Expurgo: ${contas} conta(s) excluída(s) vencida(s) apagada(s).`))
+    .catch((error) => console.error('Expurgo de contas excluídas falhou:', error.message));
+}
+
+expurgar();
+setInterval(expurgar, UM_DIA_MS).unref();
 
 app.listen(port, () => console.log(`Schedio Drasis em http://127.0.0.1:${port}`));
 

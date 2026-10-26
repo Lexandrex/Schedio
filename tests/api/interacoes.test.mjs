@@ -215,3 +215,70 @@ test('excluir a conta devolve os likes dela, mas não as denúncias', async () =
 
   assert.deepEqual(await contadores(id), { likes: 0, denuncias: 1 })
 })
+
+const denunciarCriador = (id, token) => amb.api(`/api/users/${id}/denuncia`, { method: 'POST', token })
+
+async function denunciasDoCriador(id) {
+  const { rows } = await amb.pool.query('SELECT denuncias FROM users WHERE id = $1', [id])
+  return rows[0].denuncias
+}
+
+test('denúncia de criador soma uma vez por usuário e aparece no perfil e na conta', async () => {
+  const criador = await amb.criarConta(emailDeTeste('criador-denunciado'))
+
+  const primeira = await denunciarCriador(criador.id, leitor.token)
+  assert.equal(primeira.status, 200)
+  assert.deepEqual(primeira.body, { denunciado: true }, 'quem denuncia não vê o total')
+
+  await denunciarCriador(criador.id, leitor.token)
+  await denunciarCriador(criador.id, outro.token)
+  assert.equal(await denunciasDoCriador(criador.id), 2)
+
+  const perfil = await amb.api(`/api/users/${criador.id}/perfil`, { token: leitor.token })
+  assert.equal(perfil.body.user.denunciado, true)
+  assert.equal('denuncias' in perfil.body.user, false, 'o total não vaza para o perfil')
+
+  const lista = await amb.api('/api/users/me/denuncias', { token: leitor.token })
+  assert.equal(lista.body.creators[0].id, criador.id, 'o mais recente vem primeiro')
+  assert.ok(Array.isArray(lista.body.projects), 'os projetos continuam na mesma resposta')
+})
+
+test('denúncias simultâneas de criador também contam uma vez', async () => {
+  const criador = await amb.criarConta(emailDeTeste('criador-simultaneo'))
+
+  await Promise.all(Array.from({ length: 6 }, () => denunciarCriador(criador.id, leitor.token)))
+
+  assert.equal(await denunciasDoCriador(criador.id), 1)
+})
+
+test('dois criadores se denunciando ao mesmo tempo não perdem denúncia', async () => {
+  const a = await amb.criarConta(emailDeTeste('cruzado-a'))
+  const b = await amb.criarConta(emailDeTeste('cruzado-b'))
+
+  const respostas = await Promise.all(
+    Array.from({ length: 4 }, (_, i) => (i % 2 ? denunciarCriador(a.id, b.token) : denunciarCriador(b.id, a.token))),
+  )
+
+  assert.ok(respostas.every((r) => r.status === 200), JSON.stringify(respostas.map((r) => r.status)))
+  assert.equal(await denunciasDoCriador(a.id), 1)
+  assert.equal(await denunciasDoCriador(b.id), 1)
+})
+
+test('ninguém denuncia a si mesmo', async () => {
+  const resposta = await denunciarCriador(leitor.id, leitor.token)
+  assert.equal(resposta.status, 400)
+})
+
+test('criador inexistente ou id inválido responde 404 sem sujar a lista', async () => {
+  const inexistente = await denunciarCriador('00000000-0000-0000-0000-000000000000', outro.token)
+  assert.equal(inexistente.status, 404)
+
+  const invalido = await denunciarCriador('nao-e-uuid', outro.token)
+  assert.equal(invalido.status, 404)
+
+  const { rows } = await amb.pool.query('SELECT criadores_reportados ? $1 AS marcou FROM users WHERE id = $2', [
+    '00000000-0000-0000-0000-000000000000',
+    outro.id,
+  ])
+  assert.equal(rows[0].marcou, false)
+})

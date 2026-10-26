@@ -7,12 +7,20 @@
  * permite saber exatamente o que cada pessoa aceitou.
  *
  * O frontend não tem cópia do texto: ele lê `GET /api/termos`.
+ *
+ * `retencaoContaExcluidaMeses` é o prazo de guarda da cópia de uma conta
+ * excluída (`contas_excluidas`). O servidor calcula o vencimento com este
+ * mesmo número que o texto mostra, então mudar o prazo é mudar o texto — e
+ * isso também pede versão nova.
  */
 
+const RETENCAO_CONTA_EXCLUIDA_MESES = 6;
+
 const TERMOS = {
-  versao: '1.0',
-  vigenciaDesde: '2026-10-11',
+  versao: '1.1',
+  vigenciaDesde: '2026-10-26',
   titulo: 'Termos de Uso e Política de Privacidade',
+  retencaoContaExcluidaMeses: RETENCAO_CONTA_EXCLUIDA_MESES,
   secoes: [
     {
       titulo: '1. Aceitação e objeto',
@@ -33,7 +41,7 @@ const TERMOS = {
     {
       titulo: '3. Dados pessoais tratados',
       paragrafos: [
-        'Em conformidade com a Lei Geral de Proteção de Dados (Lei nº 13.709/2018 — LGPD), a Plataforma trata apenas os dados que você fornece e os necessários ao funcionamento do serviço: e-mail; senha, armazenada exclusivamente em forma de hash irreversível; nome de usuário, descrição e cor de perfil; projetos, textos, imagens e demais conteúdos que você criar ou enviar; e o registro da data e da versão destes Termos que você aceitou.',
+        'Em conformidade com a Lei Geral de Proteção de Dados (Lei nº 13.709/2018 — LGPD), a Plataforma trata apenas os dados que você fornece e os necessários ao funcionamento do serviço: e-mail; senha, armazenada exclusivamente em forma de hash irreversível; nome de usuário, descrição e cor de perfil; projetos, textos, imagens e demais conteúdos que você criar ou enviar; as curtidas, os projetos salvos e as denúncias que você fizer ou receber; e o registro da data e da versão destes Termos que você aceitou.',
         'Esses dados são usados para: criar e autenticar sua conta; confirmar seu e-mail e permitir a recuperação de senha; salvar e exibir seus projetos; apresentar seu perfil público de criador; e comprovar o seu aceite destes Termos.',
         'As bases legais são a execução do contrato formado por estes Termos (art. 7º, V, da LGPD), o cumprimento de obrigação legal (art. 7º, II) e o exercício regular de direitos (art. 7º, VI), inclusive para guarda do registro de aceite.',
         'A Plataforma não vende, aluga nem cede seus dados para fins publicitários.',
@@ -51,8 +59,9 @@ const TERMOS = {
       titulo: '5. Seus direitos como titular',
       paragrafos: [
         'Você pode, a qualquer momento, confirmar a existência de tratamento, acessar e corrigir seus dados, solicitar informações sobre compartilhamento e pedir a eliminação dos seus dados, nos termos do art. 18 da LGPD.',
-        'Os dados de perfil podem ser corrigidos na própria página da conta. A exclusão da conta, também disponível nessa página, apaga seu cadastro, seus projetos e as imagens enviadas.',
-        'Registros cuja guarda seja exigida por lei ou necessária ao exercício de direitos poderão ser mantidos pelo prazo legal, mesmo após a exclusão da conta.',
+        'Os dados de perfil podem ser corrigidos na própria página da conta. A exclusão da conta, também disponível nessa página, remove imediatamente da Plataforma seu cadastro, seu perfil público e seus projetos, que deixam de ser acessíveis a qualquer usuário.',
+        `Uma cópia do estado da conta no momento da exclusão — e-mail, nome de usuário, o registro de aceite destes Termos, o número de denúncias recebidas e cada projeto com seu conteúdo, status e imagens — é guardada de forma restrita por até ${RETENCAO_CONTA_EXCLUIDA_MESES} meses, prazo inspirado na guarda de registros de aplicações prevista no art. 15 do Marco Civil da Internet. A cópia serve apenas à apuração de denúncias, ao atendimento de requisições de autoridades e ao exercício regular de direitos (arts. 7º, VI, e 16, I, da LGPD), não é exibida na Plataforma e não permite reativar a conta. Vencido o prazo, ela é apagada definitivamente, junto com as imagens.`,
+        'Registros cuja guarda por prazo maior seja exigida por lei ou por ordem judicial poderão ser mantidos pelo tempo exigido.',
       ],
     },
     {
@@ -89,6 +98,7 @@ const TERMOS = {
     {
       titulo: '10. Denúncias, remoção e suspensão',
       paragrafos: [
+        'Qualquer usuário pode denunciar um projeto publicado ou um criador. A denúncia não pode ser desfeita, não identifica quem denunciou a quem foi denunciado e é registrada para avaliação posterior.',
         'A Plataforma pode, a seu critério e sem aviso prévio, remover ou tornar privado qualquer conteúdo que viole estes Termos ou a lei, bem como suspender ou encerrar contas envolvidas, sem que isso gere direito a indenização.',
         'Conteúdo será removido mediante ordem judicial específica e, no caso de imagens de nudez ou atos sexuais divulgados sem consentimento, mediante notificação da pessoa retratada ou de seu representante legal (art. 21 do Marco Civil da Internet).',
         'A remoção de conteúdo pela Plataforma não transfere a ela a responsabilidade pelo que foi publicado.',
@@ -110,7 +120,7 @@ const TERMOS = {
     {
       titulo: '13. Encerramento da conta',
       paragrafos: [
-        'Você pode excluir sua conta a qualquer momento pela página da conta, o que é definitivo e não pode ser desfeito. As obrigações e isenções destes Termos referentes ao período em que a conta esteve ativa continuam válidas após o encerramento.',
+        `Você pode excluir sua conta a qualquer momento pela página da conta, o que é definitivo e não pode ser desfeito. A cópia descrita na seção 5 é mantida por até ${RETENCAO_CONTA_EXCLUIDA_MESES} meses e então apagada. As obrigações e isenções destes Termos referentes ao período em que a conta esteve ativa continuam válidas após o encerramento.`,
       ],
     },
     {
