@@ -19,6 +19,40 @@ const SCROLL_GESTURE_GAP = 250
 const SWIPE_THRESHOLD = 40
 
 /**
+ * O palco tem a proporção da tela e o maior tamanho que cabe no visor. A conta
+ * é do CSS (`--proporcao` com unidades de contêiner): girar o celular só faz o
+ * palco crescer para as laterais, sem distorcer nem girar a tela do projeto.
+ */
+const estiloDoPalco = (screen) => ({
+  aspectRatio: `${screen.width} / ${screen.height}`,
+  '--proporcao': screen.width / screen.height,
+})
+
+/** Tela mais larga que alta: num celular em pé ela fica pequena, e vale sugerir deitá-lo. */
+const ehDeitada = (screen) => screen.width > screen.height * 1.05
+
+function useTelaCheia() {
+  const [ativa, setAtiva] = useState(() => Boolean(document.fullscreenElement))
+  useEffect(() => {
+    const aoMudar = () => setAtiva(Boolean(document.fullscreenElement))
+    document.addEventListener('fullscreenchange', aoMudar)
+    return () => {
+      document.removeEventListener('fullscreenchange', aoMudar)
+      // Sair da leitura não deve deixar o app inteiro preso em tela cheia.
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {})
+    }
+  }, [])
+  const alternar = () => {
+    const pedido = document.fullscreenElement
+      ? document.exitFullscreen()
+      : document.documentElement.requestFullscreen()
+    pedido.catch(() => {})
+  }
+  // O Safari do iPhone não tem a API para elementos que não sejam vídeo.
+  return { suportada: Boolean(document.fullscreenEnabled), ativa, alternar }
+}
+
+/**
  * Desenha um quadro (parado ou no meio de uma transição). As áreas de clique
  * levam `data-el`; quem trata os eventos é o palco, lendo esse atributo.
  */
@@ -97,10 +131,7 @@ function TweenStage({ anim, elements, onDone }) {
   const desenho = mixFrames(de, para, t, anim.transition)
 
   return (
-    <div
-      className="player-stage"
-      style={{ aspectRatio: `${desenho.screen.width} / ${desenho.screen.height}` }}
-    >
+    <div className="player-stage" style={estiloDoPalco(desenho.screen)}>
       <div className="player-layer">
         <FrameView desenho={desenho} />
       </div>
@@ -116,9 +147,10 @@ export default function PrototypePlayer({
   startScreenId,
   onClose,
   showArrows = false,
-  exitLabel = 'Sair da simulação (Esc)',
+  exitLabel = 'Sair da simulação',
   emptyMessage,
 }) {
+  const telaCheia = useTelaCheia()
   // Camada oculta não entra na simulação nem na leitura — some com o elemento
   // e, se for uma tela, com a tela inteira.
   const visiveis = useMemo(() => visibleElements(elements), [elements])
@@ -395,15 +427,61 @@ export default function PrototypePlayer({
   )
 
   return (
-    <div className="player-overlay">
+    <div className={`player-overlay${showArrows ? ' player-overlay--setas' : ''}`}>
       <header className="player-bar">
         <span className="player-title">{current ? current.name : 'Sem telas'}</span>
         <div className="player-actions">
-          <button className="text-button" type="button" onClick={voltar} disabled={!history.length}>
+          <button
+            className="text-button player-back"
+            type="button"
+            onClick={voltar}
+            disabled={!history.length}
+          >
             Voltar
           </button>
-          <button className="text-button" type="button" onClick={onClose}>
-            {exitLabel}
+          {telaCheia.suportada && (
+            <button
+              className="player-fullscreen"
+              type="button"
+              onClick={telaCheia.alternar}
+              aria-label={telaCheia.ativa ? 'Sair da tela cheia' : 'Tela cheia'}
+              title={telaCheia.ativa ? 'Sair da tela cheia' : 'Tela cheia'}
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                {telaCheia.ativa ? (
+                  <path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" />
+                ) : (
+                  <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
+                )}
+              </svg>
+            </button>
+          )}
+          <button
+            className="text-button player-exit"
+            type="button"
+            onClick={onClose}
+            aria-label={exitLabel}
+            title={exitLabel}
+          >
+            {/* Com o celular deitado o botão encolhe para o ✕, para caber na margem ao lado da tela. */}
+            <span className="player-exit-label">
+              {exitLabel}
+              {/* Esc não existe no celular: o atalho só aparece onde há teclado e mouse. */}
+              <span className="player-key"> (Esc)</span>
+            </span>
+            <span className="player-exit-icon" aria-hidden="true">
+              ✕
+            </span>
           </button>
         </div>
       </header>
@@ -442,7 +520,7 @@ export default function PrototypePlayer({
         {current && !emTween && (
           <div
             className="player-stage"
-            style={{ aspectRatio: `${current.width} / ${current.height}` }}
+            style={estiloDoPalco(current)}
             onClick={handleClick}
             onWheel={handleWheel}
             onTouchStart={handleTouchStart}
@@ -484,6 +562,28 @@ export default function PrototypePlayer({
           >
             ›
           </button>
+        )}
+
+        {current && ehDeitada(current) && (
+          // Só aparece com o celular em pé (regra do CSS): deitado, a tela
+          // ocupa a largura e cresce até a altura disponível.
+          <p className="player-rotate-hint">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <rect x="3" y="9" width="18" height="11" rx="2" />
+              <path d="M7 5.5A8 8 0 0 1 17 4.5M17 4.5V1.8M17 4.5h-2.7" />
+            </svg>
+            Deite o celular para ver esta tela maior
+          </p>
         )}
       </div>
     </div>

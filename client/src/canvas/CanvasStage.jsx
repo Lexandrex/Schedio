@@ -49,6 +49,9 @@ export default function CanvasStage({
   // Último elemento clicado. O `dblclick` não serve para descobrir isso: a
   // captura de ponteiro do arraste redireciona esse evento para o <svg>.
   const lastHitRef = useRef(null)
+  // Dedos encostados no mapa (toque). Dois juntos viram pinça: zoom ancorado
+  // no ponto entre eles, que também arrasta o mapa se os dedos andarem juntos.
+  const toquesRef = useRef(new Map())
   const [draft, setDraft] = useState(null)
   const [cursorPoint, setCursorPoint] = useState(null)
   const [editingId, setEditingId] = useState(null)
@@ -81,8 +84,69 @@ export default function CanvasStage({
     }
   }
 
+  /** Ponto entre os dois dedos, relativo ao mapa, e a distância entre eles. */
+  function medirPinca() {
+    const [a, b] = [...toquesRef.current.values()]
+    if (!b) return null
+    const rect = svgRef.current.getBoundingClientRect()
+    return {
+      meio: { x: (a.x + b.x) / 2 - rect.left, y: (a.y + b.y) / 2 - rect.top },
+      distancia: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)),
+    }
+  }
+
+  function iniciarPinca() {
+    // O primeiro dedo já tinha começado um gesto: desfaz o que ele mexeu, já
+    // que a intenção era o zoom.
+    const drag = dragRef.current
+    if (drag?.mode === 'move') {
+      const patches = { [drag.origin.id]: { x: drag.origin.x, y: drag.origin.y } }
+      drag.carried.forEach((child) => {
+        patches[child.id] = { x: child.x, y: child.y }
+      })
+      onUpdateMany(patches)
+    }
+    if (drag?.mode === 'resize') {
+      const { id, x, y, width, height } = drag.origin
+      onUpdate(id, { x, y, width, height })
+    }
+    setDraft(null)
+    dragRef.current = { mode: 'pinch', ...medirPinca(), origin: { ...view } }
+  }
+
+  function moverPinca(drag) {
+    const agora = medirPinca()
+    if (!agora) return
+    const zoom = Math.min(
+      MAX_ZOOM,
+      Math.max(MIN_ZOOM, drag.origin.zoom * (agora.distancia / drag.distancia)),
+    )
+    const ratio = zoom / drag.origin.zoom
+    // O ponto do mapa que estava entre os dedos no começo continua entre eles.
+    onViewChange({
+      zoom,
+      x: agora.meio.x - (drag.meio.x - drag.origin.x) * ratio,
+      y: agora.meio.y - (drag.meio.y - drag.origin.y) * ratio,
+    })
+  }
+
   function handlePointerDown(event) {
     if (event.button !== 0) return
+
+    try {
+      svgRef.current.setPointerCapture(event.pointerId)
+    } catch {
+      // Alguns navegadores recusam a captura; o arrasto segue funcionando sem ela.
+    }
+
+    if (event.pointerType === 'touch') {
+      toquesRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY })
+      if (toquesRef.current.size === 2) {
+        iniciarPinca()
+        return
+      }
+      if (toquesRef.current.size > 2) return
+    }
 
     // Clicar no mapa encerra a edição. Não dependemos só do `blur`: se o foco
     // sair por outro caminho (troca de janela), o editor ficaria aberto.
@@ -94,12 +158,6 @@ export default function CanvasStage({
     const handle = event.target.getAttribute?.('data-handle')
 
     lastHitRef.current = targetId || null
-
-    try {
-      svgRef.current.setPointerCapture(event.pointerId)
-    } catch {
-      // Alguns navegadores recusam a captura; o arrasto segue funcionando sem ela.
-    }
 
     // Ferramenta de ligação: primeiro clique escolhe a origem, segundo o destino.
     if (tool === TOOLS.connect) {
@@ -163,6 +221,14 @@ export default function CanvasStage({
 
   function handlePointerMove(event) {
     const drag = dragRef.current
+    if (toquesRef.current.has(event.pointerId)) {
+      toquesRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY })
+    }
+    if (drag?.mode === 'pinch') {
+      moverPinca(drag)
+      return
+    }
+
     const point = toCanvasPoint(event)
 
     if (tool === TOOLS.connect && pendingFrom) setCursorPoint(point)
@@ -263,9 +329,22 @@ export default function CanvasStage({
   }
 
   function handlePointerUp(event) {
+    toquesRef.current.delete(event.pointerId)
     const drag = dragRef.current
+    try {
+      svgRef.current.releasePointerCapture(event.pointerId)
+    } catch {
+      // No toque o `pointerleave` chega depois do `pointerup`, quando o dedo
+      // já não existe mais: soltar a captura dele lança erro.
+    }
+
+    // A pinça só acaba quando o último dedo sai: tirar um deles não deve virar
+    // arrasto do mapa nem clique.
+    if (drag?.mode === 'pinch') {
+      if (!toquesRef.current.size) dragRef.current = null
+      return
+    }
     dragRef.current = null
-    svgRef.current.releasePointerCapture?.(event.pointerId)
 
     if (drag?.mode === 'create') {
       const { rect, type } = drag
