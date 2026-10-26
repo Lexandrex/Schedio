@@ -1018,6 +1018,45 @@ a.reported-item:hover {
   font-size: 0.72rem;
 }
 
+/* Denúncia de criador, no perfil */
+.profile-report {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-color);
+}
+
+/* Aba de denúncias da conta: um grupo para projetos, outro para criadores */
+.reported-group + .reported-group {
+  margin-top: 18px;
+}
+
+.reported-group-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+.reported-avatar {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  border-radius: 50%;
+  color: var(--text-muted);
+}
+
+.account-card .account-retention {
+  margin: 10px 0 16px;
+  line-height: 1.5;
+}
+
 /* Canvas / editor de projeto */
 .canvas-page {
   display: flex;

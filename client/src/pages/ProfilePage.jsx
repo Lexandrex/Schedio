@@ -4,6 +4,7 @@ import { apiRequest } from '../api.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import ProfileWorks from '../components/ProfileWorks.jsx'
 import Avatar from '../components/Avatar.jsx'
+import { AlertIcon } from '../components/InteractionIcons.jsx'
 
 const NO_PROJECTS = []
 
@@ -26,6 +27,10 @@ export default function ProfilePage() {
   const projects = isLoading ? NO_PROJECTS : result.projects
   const error = isLoading ? '' : result.error
 
+  const [confirmReport, setConfirmReport] = useState(false)
+  const [isReporting, setIsReporting] = useState(false)
+  const [reportError, setReportError] = useState('')
+
   useEffect(() => {
     if (isSelf) return
     apiRequest(`/api/users/${id}/perfil`)
@@ -36,6 +41,21 @@ export default function ProfilePage() {
   }, [id, isSelf])
 
   if (isSelf) return <Navigate to="/conta" replace />
+
+  // A denúncia não se desfaz: confirma antes, e depois o botão fica marcado.
+  async function report() {
+    setIsReporting(true)
+    setReportError('')
+    try {
+      await apiRequest(`/api/users/${id}/denuncia`, { method: 'POST' })
+      setResult((current) => ({ ...current, profile: { ...current.profile, denunciado: true } }))
+      setConfirmReport(false)
+    } catch (requestError) {
+      setReportError(requestError.message)
+    } finally {
+      setIsReporting(false)
+    }
+  }
 
   // Volta para onde a pessoa estava (normalmente a apresentação da obra);
   // aberto direto pelo link, não há histórico e o início é o destino natural.
@@ -77,6 +97,44 @@ export default function ProfilePage() {
                 <p className="profile-bio">
                   {profile.bio || 'Este criador ainda não escreveu uma descrição.'}
                 </p>
+              )}
+
+              {profile && (
+                <div className="profile-report">
+                  <button
+                    className={`detail-action detail-action--report${profile.denunciado ? ' active' : ''}`}
+                    type="button"
+                    disabled={profile.denunciado || isReporting}
+                    title={
+                      profile.denunciado
+                        ? 'Você já denunciou este criador. Veja a lista na sua conta.'
+                        : 'Denunciar este criador'
+                    }
+                    onClick={() => setConfirmReport(true)}
+                  >
+                    <AlertIcon />
+                    {profile.denunciado ? 'Criador denunciado' : 'Denunciar criador'}
+                  </button>
+
+                  {confirmReport && !profile.denunciado && (
+                    <div className="detail-report-confirm" role="alertdialog" aria-label="Confirmar denúncia">
+                      <p>
+                        Denunciar <strong>{profile.nome || profile.email}</strong>? A denúncia não
+                        pode ser desfeita, não revela quem denunciou e será avaliada depois.
+                      </p>
+                      <div className="detail-report-actions">
+                        <button className="text-button" type="button" onClick={() => setConfirmReport(false)}>
+                          Cancelar
+                        </button>
+                        <button className="danger-button" type="button" disabled={isReporting} onClick={report}>
+                          {isReporting ? 'Denunciando...' : 'Denunciar'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {reportError && <p className="home-status home-status--error">{reportError}</p>}
+                </div>
               )}
             </section>
           </div>
