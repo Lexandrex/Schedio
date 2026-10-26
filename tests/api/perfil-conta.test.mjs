@@ -69,7 +69,7 @@ test('o dono vê todas as obras, com o status de cada uma', async () => {
 test('o perfil não vaza a senha do criador', async () => {
   const { body } = await amb.api(`/api/users/${criador.id}/perfil`, { token: visitante.token })
 
-  assert.deepEqual(Object.keys(body.user).sort(), ['bio', 'email', 'id', 'nome'])
+  assert.deepEqual(Object.keys(body.user).sort(), ['bio', 'email', 'foto', 'id', 'nome'])
 })
 
 test('perfil inexistente responde 404', async () => {
@@ -82,6 +82,38 @@ test('perfil inexistente responde 404', async () => {
 test('o perfil exige estar logado', async () => {
   const resposta = await amb.api(`/api/users/${criador.id}/perfil`)
   assert.equal(resposta.status, 401)
+})
+
+test('a foto de perfil aparece para quem visita, para o dono e na sessão', async () => {
+  const conta = await amb.criarConta(emailDeTeste('com-foto'))
+  // O envio depende do Cloudinary, que o ambiente não tem: a foto entra pelo banco.
+  const url = 'https://res.cloudinary.com/demo/image/upload/foto.jpg'
+  await amb.pool.query('UPDATE users SET foto = $1, foto_public_id = $2 WHERE id = $3', [url, 'fotos/x', conta.id])
+
+  const perfil = await amb.api(`/api/users/${conta.id}/perfil`, { token: visitante.token })
+  const sessao = await amb.api('/api/auth/me', { token: conta.token })
+  const edicao = await amb.api('/api/users/me', {
+    method: 'PATCH',
+    token: conta.token,
+    body: { nome: 'Com Foto', cor: '#1E1E1E' },
+  })
+
+  assert.equal(perfil.body.user.foto, url)
+  assert.equal(sessao.body.user.foto, url, 'o menu da conta lê a foto da sessão')
+  assert.equal(edicao.body.user.foto, url, 'salvar o formulário não apaga a foto')
+  assert.equal('foto_public_id' in perfil.body.user, false, 'o public_id não sai do servidor')
+})
+
+test('quem não tem foto recebe null, não um campo ausente', async () => {
+  const { body } = await amb.api(`/api/users/${criador.id}/perfil`, { token: visitante.token })
+  assert.equal(body.user.foto, null)
+})
+
+test('as rotas de foto exigem estar logado', async () => {
+  for (const method of ['POST', 'DELETE']) {
+    const resposta = await amb.api('/api/users/me/foto', { method })
+    assert.equal(resposta.status, 401, method)
+  }
 })
 
 test('a conta aceita nome, descrição e cor de fundo', async () => {
@@ -182,6 +214,8 @@ test('sem Cloudinary, as rotas de imagem dão 503 nomeando o que falta', async (
     [`/api/projects/${projeto.id}/imagens`, 'POST'],
     [`/api/projects/${projeto.id}/capa`, 'POST'],
     ['/api/imagens/00000000-0000-0000-0000-000000000000', 'DELETE'],
+    ['/api/users/me/foto', 'POST'],
+    ['/api/users/me/foto', 'DELETE'],
   ]
   for (const [caminho, method] of rotas) {
     const resposta = await amb.api(caminho, { method, token: criador.token })

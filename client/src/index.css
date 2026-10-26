@@ -346,6 +346,7 @@ a:hover {
   background: var(--bg-panel);
   color: var(--text-muted);
   cursor: pointer;
+  overflow: hidden;
   transition: background 0.18s;
 }
 
@@ -2142,6 +2143,70 @@ a.reported-item:hover {
   border: 2px solid var(--border-strong);
   border-radius: 50%;
   color: var(--text-muted);
+  overflow: hidden;
+}
+
+/* Preenche o círculo de quem a contém (menu da conta, perfil). */
+.avatar-photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.profile-photo {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.profile-photo-button {
+  position: relative;
+  padding: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+.profile-photo-button:disabled {
+  cursor: progress;
+}
+
+/* Escondida até o mouse (ou o foco do teclado) chegar na foto. */
+.profile-photo-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 600;
+  opacity: 0;
+  transition: opacity 0.18s;
+}
+
+.profile-photo-button:hover .profile-photo-overlay,
+.profile-photo-button:focus-visible .profile-photo-overlay,
+.profile-photo-button[data-busy] .profile-photo-overlay {
+  opacity: 1;
+}
+
+.profile-photo-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.profile-photo-remove {
+  font-size: 0.75rem;
+  margin-top: 0;
+  padding: 0;
 }
 
 .bio-textarea {

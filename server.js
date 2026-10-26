@@ -209,7 +209,7 @@ app.post('/api/auth/login', async (request, response, next) => {
 app.get('/api/auth/me', requireAuth, async (request, response, next) => {
   try {
     const result = await query(
-      'SELECT id, email, nome, bio, cor, termos_versao, termos_aceitos_em FROM users WHERE id = $1',
+      'SELECT id, email, nome, bio, foto, cor, termos_versao, termos_aceitos_em FROM users WHERE id = $1',
       [request.userId],
     );
     const user = result.rows[0];
@@ -237,7 +237,7 @@ app.patch('/api/users/me', requireAuth, async (request, response, next) => {
     }
 
     const result = await query(
-      'UPDATE users SET nome = $1, bio = $2, cor = $3 WHERE id = $4 RETURNING id, email, nome, bio, cor',
+      'UPDATE users SET nome = $1, bio = $2, cor = $3 WHERE id = $4 RETURNING id, email, nome, bio, foto, cor',
       [nome, bio, cor, request.userId],
     );
     return response.json({ user: result.rows[0] });
@@ -246,7 +246,7 @@ app.patch('/api/users/me', requireAuth, async (request, response, next) => {
 
 app.delete('/api/users/me', requireAuth, async (request, response, next) => {
   try {
-    const result = await query('SELECT senha FROM users WHERE id = $1', [request.userId]);
+    const result = await query('SELECT senha, foto_public_id FROM users WHERE id = $1', [request.userId]);
     const user = result.rows[0];
     if (!user) return response.status(401).json({ message: 'Sessão inválida ou expirada.' });
 
@@ -267,6 +267,11 @@ app.delete('/api/users/me', requireAuth, async (request, response, next) => {
        DELETE FROM users WHERE id = $1`,
       [request.userId],
     );
+
+    // Best-effort, como na exclusão de projeto: a conta já se foi.
+    if (storage.isConfigured && user.foto_public_id) {
+      await storage.destroyImage(user.foto_public_id).catch(() => {});
+    }
     return response.status(204).send();
   } catch (error) { return next(error); }
 });
@@ -281,7 +286,7 @@ app.delete('/api/users/me', requireAuth, async (request, response, next) => {
 app.get('/api/users/:id/perfil', requireAuth, async (request, response, next) => {
   try {
     const userResult = await query(
-      'SELECT id, nome, email, bio FROM users WHERE id = $1',
+      'SELECT id, nome, email, bio, foto FROM users WHERE id = $1',
       [request.params.id],
     );
     const user = userResult.rows[0];
@@ -768,6 +773,56 @@ app.post(
     }
   },
 );
+
+app.post(
+  '/api/users/me/foto',
+  requireAuth,
+  requireStorage,
+  receberImagem,
+  async (request, response, next) => {
+    try {
+      if (!request.file) return response.status(400).json({ message: 'Nenhuma imagem enviada.' });
+
+      const atual = await query('SELECT foto_public_id FROM users WHERE id = $1', [request.userId]);
+      if (!atual.rows[0]) return response.status(401).json({ message: 'Sessão inválida ou expirada.' });
+      const fotoAnterior = atual.rows[0].foto_public_id;
+
+      const enviada = await storage.uploadBuffer(request.file.buffer, {
+        folder: `${storage.FOLDER}/fotos`,
+      });
+      const result = await query(
+        'UPDATE users SET foto = $1, foto_public_id = $2 WHERE id = $3 RETURNING foto',
+        [enviada.url, enviada.publicId, request.userId],
+      );
+
+      // Igual à capa: a foto substituída só sai depois do update dar certo.
+      if (fotoAnterior) {
+        await storage.destroyImage(fotoAnterior).catch(() => {});
+      }
+
+      return response.json({ foto: result.rows[0].foto });
+    } catch (error) { return next(error); }
+  },
+);
+
+app.delete('/api/users/me/foto', requireAuth, requireStorage, async (request, response, next) => {
+  try {
+    const result = await query(
+      `UPDATE users u SET foto = NULL, foto_public_id = NULL
+       FROM (SELECT foto_public_id FROM users WHERE id = $1) anterior
+       WHERE u.id = $1
+       RETURNING anterior.foto_public_id`,
+      [request.userId],
+    );
+    if (!result.rowCount) return response.status(401).json({ message: 'Sessão inválida ou expirada.' });
+
+    const fotoAnterior = result.rows[0].foto_public_id;
+    if (fotoAnterior) {
+      await storage.destroyImage(fotoAnterior).catch(() => {});
+    }
+    return response.status(204).send();
+  } catch (error) { return next(error); }
+});
 
 app.delete('/api/projects/:id', requireAuth, async (request, response, next) => {
   try {

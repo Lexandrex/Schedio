@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../context/AuthContext.jsx'
-import UserIcon from './UserIcon.jsx'
+import Avatar from './Avatar.jsx'
 
 export default function AccountMenu({ children }) {
   const { user, logout } = useAuth()
@@ -30,7 +30,7 @@ export default function AccountMenu({ children }) {
         aria-expanded={menuOpen}
         aria-label="Menu da conta"
       >
-        <UserIcon />
+        <Avatar foto={user.foto} />
       </button>
 
       {menuOpen && (

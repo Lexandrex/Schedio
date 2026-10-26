@@ -3,7 +3,7 @@ import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import { apiRequest } from '../api.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import ProfileWorks from '../components/ProfileWorks.jsx'
-import UserIcon from '../components/UserIcon.jsx'
+import Avatar from '../components/Avatar.jsx'
 
 const NO_PROJECTS = []
 
@@ -66,7 +66,7 @@ export default function ProfilePage() {
             <section className="account-card">
               <div className="account-profile-row">
                 <span className="account-avatar" aria-hidden="true">
-                  <UserIcon size={34} />
+                  <Avatar foto={profile?.foto} size={34} />
                 </span>
                 <div>
                   <h1>{profile ? profile.nome || profile.email : 'Carregando...'}</h1>
