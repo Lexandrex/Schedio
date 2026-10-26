@@ -45,7 +45,7 @@ export default function ProjectReaderPage() {
       connections={conteudo.connections || []}
       startScreenId={conteudo.startScreen || null}
       showArrows
-      exitLabel="Sair da leitura (Esc)"
+      exitLabel="Sair da leitura"
       emptyMessage="Este projeto ainda não tem telas para navegar."
       // A apresentação usa o aviso para convidar ao like quem acabou de ler.
       onClose={() => navigate(`/projeto/${id}`, { state: { fromReading: true } })}

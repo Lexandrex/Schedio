@@ -42,6 +42,9 @@ const TOOL_SHORTCUTS = {
   c: TOOLS.connect,
 }
 
+/** Celular, em pé (mesmo corte do layout de celular no CSS) ou deitado. */
+const telaEstreita = () => window.matchMedia('(max-width: 760px), (max-height: 500px)').matches
+
 /** Coordenadas do mouse no mapa — o único que re-renderiza quando o mouse anda. */
 function Coordenadas({ store }) {
   const coords = useStore(store)
@@ -76,8 +79,9 @@ export default function CanvasPage() {
   const imagemInputRef = useRef(null)
   const capaInputRef = useRef(null)
   const [view, setView] = useState({ x: 240, y: 160, zoom: 1 })
-  const [painelIcones, setPainelIcones] = useState(true)
-  const [painelCamadas, setPainelCamadas] = useState(true)
+  // No celular os painéis abertos cobririam quase todo o mapa: começam recolhidos.
+  const [painelIcones, setPainelIcones] = useState(() => !telaEstreita())
+  const [painelCamadas, setPainelCamadas] = useState(() => !telaEstreita())
   // Store pelo mesmo motivo: muda a cada `pointermove` sobre o mapa.
   const [coordsStore] = useState(() => createStore({ x: 0, y: 0 }))
 

@@ -1086,6 +1086,9 @@ a.reported-item:hover {
   position: relative;
   flex: 1;
   min-width: 0;
+  /* Formas fora da área visível não podem esticar a página: no toque, ela
+     rolaria inteira junto com o mapa. */
+  overflow: hidden;
 }
 
 .canvas-stage {
@@ -1518,6 +1521,8 @@ a.reported-item:hover {
   color: var(--text-muted);
   font-size: 0.75rem;
   white-space: nowrap;
+  /* Acima do trilho dos painéis, que em tela estreita chega até aqui. */
+  z-index: 6;
 }
 
 /* Simulador de protótipo */
@@ -1560,6 +1565,24 @@ a.reported-item:hover {
   cursor: not-allowed;
 }
 
+.player-fullscreen {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.player-fullscreen:hover {
+  border-color: var(--border-strong);
+  color: #fff;
+}
+
 .player-viewport {
   position: relative;
   flex: 1;
@@ -1567,6 +1590,34 @@ a.reported-item:hover {
   place-items: center;
   min-height: 0;
   padding: 24px;
+  /* O palco se mede pelas unidades deste contêiner (cqw/cqh). */
+  container-type: size;
+}
+
+/* Some com o celular deitado e em telas grandes: só vale em pé. */
+.player-rotate-hint {
+  display: none;
+  position: absolute;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%);
+  align-items: center;
+  gap: 8px;
+  width: max-content;
+  max-width: calc(100% - 140px);
+  margin: 0;
+  padding: 7px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: var(--bg-panel);
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  line-height: 1.35;
+  pointer-events: none;
+}
+
+.player-rotate-hint svg {
+  flex: none;
 }
 
 .player-arrow {
@@ -1607,9 +1658,10 @@ a.reported-item:hover {
 
 .player-stage {
   position: relative;
-  max-width: 100%;
-  max-height: 100%;
-  height: 100%;
+  /* O maior retângulo com a proporção da tela que cabe no visor: limitado
+     pela largura ou pela altura, o que acabar primeiro. A altura sai do
+     `aspect-ratio` posto inline. */
+  width: min(100cqw, 100cqh * var(--proporcao, 1));
   overflow: hidden;
   border: 1px solid var(--border-color);
   border-radius: 10px;
@@ -2400,7 +2452,8 @@ button.account-back {
 }
 
 /* Responsive */
-@media (max-width: 520px) {
+@media (max-width: 520px), (orientation: landscape) and (max-height: 500px) {
+  /* Fixa no canto, a marca cobriria o cartão quando ele ocupa a tela toda. */
   .brand {
     position: static;
     margin-bottom: 34px;
@@ -2413,8 +2466,428 @@ button.account-back {
     align-items: stretch;
     justify-content: center;
   }
+}
 
+@media (orientation: landscape) and (max-height: 500px) {
+  .auth-shell {
+    margin: 0 auto;
+  }
+}
+
+@media (max-width: 520px) {
   .auth-card {
     padding: 36px 25px 27px;
+  }
+
+  .editor-header {
+    flex-wrap: wrap;
+  }
+
+  .editor-header .search-input {
+    order: 3;
+    max-width: none;
+    flex-basis: 100%;
+  }
+
+  .new-project-button {
+    margin-left: auto;
+  }
+
+  .editor-header .avatar-menu {
+    margin-left: 0;
+  }
+
+  /* Duas colunas mesmo no celular estreito: uma capa só ficaria do tamanho da tela. */
+  .project-grid,
+  .editor-grid {
+    grid-template-columns: repeat(auto-fill, minmax(135px, 1fr));
+    gap: 18px 14px;
+  }
+
+  /* A lixeira flutua no canto: sem folga embaixo ela cobriria a última linha. */
+  .editor-page {
+    padding-bottom: 120px;
+  }
+
+  .trash-area {
+    left: 20px;
+    right: 20px;
+    bottom: 20px;
+    justify-content: flex-end;
+  }
+
+  .trash-confirm {
+    flex: 1;
+  }
+
+  .detail-card {
+    padding: 20px;
+    gap: 20px;
+  }
+
+  .detail-cover {
+    width: min(190px, 60%);
+    margin: 0 auto;
+  }
+
+  .detail-info {
+    flex-basis: 100%;
+    min-width: 0;
+  }
+
+  .detail-read {
+    width: 100%;
+  }
+
+  .account-card,
+  .modal-card {
+    padding: 22px 20px;
+  }
+
+  .terms-card {
+    padding: 22px 20px 0;
+  }
+
+  .terms-body,
+  .terms-progress {
+    margin: 0 -20px;
+  }
+
+  .terms-body {
+    padding: 4px 20px 8px;
+  }
+}
+
+/* Modal mais alto que a tela (celular deitado): rola em vez de cortar o topo.
+   As margens automáticas centralizam quando cabe e encostam no topo quando não. */
+.modal-overlay {
+  overflow-y: auto;
+}
+
+.modal-overlay > .modal-card {
+  margin: auto;
+}
+
+/* Sem mouse não existe "passar por cima": o convite para trocar a foto fica à vista. */
+@media (hover: none) {
+  .profile-photo-overlay {
+    justify-content: flex-end;
+    padding-bottom: 7px;
+    background: linear-gradient(transparent 62%, rgb(0 0 0 / 65%) 62%);
+    opacity: 1;
+  }
+
+  .profile-photo-overlay svg {
+    display: none;
+  }
+
+  .player-key {
+    display: none;
+  }
+}
+
+/* --- Editor (mapa) --- */
+.canvas-page {
+  /* `dvh` desconta a barra de endereço do celular, que o `vh` ignora. */
+  height: 100dvh;
+}
+
+.canvas-title {
+  min-width: 0;
+}
+
+.canvas-title h1 {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 1100px) {
+  .canvas-header {
+    gap: 14px;
+  }
+
+  .properties-panel {
+    width: 236px;
+    padding: 16px;
+  }
+
+  .canvas-rail {
+    width: 210px;
+  }
+
+  /* Embaixo, à esquerda, o zoom encostaria na barra de ferramentas. */
+  .canvas-status {
+    top: 16px;
+    right: 16px;
+    bottom: auto;
+    left: auto;
+  }
+
+  .canvas-hint {
+    width: max-content;
+    max-width: calc(100% - 32px);
+    border-radius: 12px;
+    text-align: center;
+    white-space: normal;
+  }
+}
+
+/* Celular: o painel de propriedades desce para baixo do mapa e os controles
+   flutuantes se reorganizam para não se sobreporem. */
+@media (max-width: 760px) {
+  .canvas-header {
+    flex-wrap: wrap;
+    gap: 8px 14px;
+    padding: 10px 14px;
+  }
+
+  /* O título ganha a primeira linha inteira; voltar e as ações ficam na de baixo. */
+  .canvas-title {
+    order: -1;
+    flex: 1 1 100%;
+    gap: 10px;
+    margin-right: 0;
+  }
+
+  .canvas-back {
+    margin-right: auto;
+  }
+
+  .canvas-save {
+    height: 34px;
+    padding: 0 14px;
+  }
+
+  .canvas-body {
+    flex-direction: column;
+  }
+
+  .properties-panel {
+    width: auto;
+    max-height: 40%;
+    padding: 14px 16px;
+    border-left: 0;
+    border-top: 1px solid var(--border-color);
+  }
+
+  .capa-preview {
+    width: 96px;
+  }
+
+  .canvas-rail {
+    top: 10px;
+    left: 10px;
+    bottom: 120px;
+    width: min(232px, calc(100% - 20px));
+  }
+
+  .canvas-toolbar {
+    bottom: 12px;
+    gap: 2px;
+    padding: 6px;
+  }
+
+  .canvas-tool {
+    width: 38px;
+    height: 38px;
+  }
+
+  /* No alto ficam os painéis recolhidos; o zoom sobe só até cima da barra. */
+  .canvas-status {
+    top: auto;
+    right: 10px;
+    bottom: 76px;
+  }
+
+  .canvas-hint {
+    bottom: 116px;
+    max-width: calc(100% - 20px);
+  }
+}
+
+/* Celular deitado: pouca altura, então o cabeçalho e as barras se apertam. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .canvas-header {
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+
+  .canvas-save {
+    height: 32px;
+  }
+
+  .canvas-toolbar {
+    bottom: 10px;
+    padding: 5px;
+  }
+
+  .canvas-tool {
+    height: 34px;
+  }
+
+  .canvas-rail {
+    top: 10px;
+    bottom: 60px;
+  }
+
+  .canvas-status {
+    top: 10px;
+  }
+}
+
+/* Coordenadas do ponteiro só fazem sentido com mouse. */
+@media (pointer: coarse) {
+  .canvas-status > span {
+    display: none;
+  }
+}
+
+/* --- Leitor e simulação --- */
+
+/* Celular em pé: as setas descem para baixo da tela do projeto, e o aviso de
+   girar aparece entre elas quando a tela é de computador. */
+@media (max-width: 640px) and (orientation: portrait) {
+  .player-bar {
+    gap: 12px;
+    padding: 10px 14px;
+  }
+
+  .player-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .player-actions {
+    flex: none;
+    gap: 12px;
+  }
+
+  .player-viewport {
+    padding: 16px 12px 84px;
+  }
+
+  .player-arrow {
+    top: auto;
+    bottom: 18px;
+    transform: none;
+  }
+
+  .player-arrow--prev {
+    left: 16px;
+  }
+
+  .player-arrow--next {
+    right: 16px;
+  }
+
+  .player-rotate-hint {
+    display: flex;
+  }
+}
+
+.player-exit-icon {
+  display: none;
+}
+
+/* Celular deitado: a tela do projeto fica na mesma orientação e usa a altura
+   inteira; o que sobra nas laterais recebe os controles, que flutuam por cima
+   em vez de ocupar uma barra. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .player-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 2;
+    padding: 8px 10px;
+    border: 0;
+    background: transparent;
+    /* A barra é só um trilho; o clique no vão entre os botões vai para a tela. */
+    pointer-events: none;
+  }
+
+  .player-title {
+    display: none;
+  }
+
+  .player-actions {
+    flex: 1;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .player-actions > * {
+    pointer-events: auto;
+  }
+
+  .player-back {
+    margin-right: auto;
+  }
+
+  /* No leitor a seta da esquerda já volta. */
+  .player-overlay--setas .player-back {
+    display: none;
+  }
+
+  .player-actions .text-button,
+  .player-fullscreen {
+    height: 34px;
+    border: 1px solid var(--border-color);
+    background: rgb(55 52 56 / 88%);
+    text-decoration: none;
+  }
+
+  .player-actions .text-button {
+    padding: 0 12px;
+    border-radius: 999px;
+    font-size: 0.74rem;
+  }
+
+  .player-fullscreen {
+    width: 34px;
+    border-radius: 50%;
+  }
+
+  .player-exit {
+    width: 34px;
+  }
+
+  .player-actions .player-exit {
+    padding: 0;
+  }
+
+  .player-exit-label {
+    display: none;
+  }
+
+  .player-exit-icon {
+    display: inline;
+  }
+
+  .player-viewport {
+    padding: 0;
+  }
+
+  .player-stage {
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .player-arrow {
+    width: 40px;
+    height: 40px;
+  }
+
+  .player-arrow--prev {
+    left: 10px;
+  }
+
+  .player-arrow--next {
+    right: 10px;
   }
 }
