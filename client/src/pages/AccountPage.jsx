@@ -43,11 +43,7 @@ export default function AccountPage() {
     setFeedback({ message: '', type: 'info' })
 
     try {
-      const data = await apiRequest('/api/users/me', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nome, bio, cor }),
-      })
+      const data = await apiRequest('/api/users/me', { method: 'PATCH', json: { nome, bio, cor } })
       updateUser(data.user)
       setFeedback({ message: 'Perfil atualizado com sucesso.', type: 'success' })
     } catch (error) {
@@ -84,11 +80,7 @@ export default function AccountPage() {
     setFeedback({ message: '', type: 'info' })
 
     try {
-      await apiRequest('/api/users/me', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: deletePassword }),
-      })
+      await apiRequest('/api/users/me', { method: 'DELETE', json: { password: deletePassword } })
       sessionStorage.setItem('schedio.accountDeleted', '1')
       logout()
     } catch (error) {

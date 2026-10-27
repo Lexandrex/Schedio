@@ -3,10 +3,13 @@ import {
   REORDER,
   TOOLS,
   elementLabel,
+  isHidden,
+  isLocked,
   isScreen,
   screenContaining,
   screensOf,
 } from './elements.js'
+import { tagKey } from '../tags.js'
 
 /** Miniatura do tipo. Ícone desenha o próprio traço — o catálogo já vem no elemento. */
 const GLYPHS = {
@@ -17,13 +20,8 @@ const GLYPHS = {
   [TOOLS.image]: 'M3 5h18v14H3z M7 11a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3 M5 17l4.5-5 3.5 4 2.5-2.5L21 17',
 }
 
-function normalizar(texto) {
-  return String(texto || '')
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .trim()
-}
+/** A mesma comparação das tags: sem acento e sem caixa. */
+const normalizar = (texto) => tagKey(texto).trim()
 
 /**
  * Agrupa os elementos pela tela que os contém. A lista é lida de cima para
@@ -82,8 +80,8 @@ function LayerRow({
   onReorder,
   onFocus,
 }) {
-  const oculto = element.hidden === true
-  const travado = element.locked === true
+  const oculto = isHidden(element)
+  const travado = isLocked(element)
   const nome = elementLabel(element)
 
   const classes = ['layer-row']

@@ -1,3 +1,5 @@
+import { tagKey } from '../tags.js'
+
 /**
  * Catálogo de ícones de interface. Todos desenhados em um viewBox 24x24 e só
  * com traço, para que a cor e a espessura sejam editáveis no painel.
@@ -68,10 +70,5 @@ export function filtrarIcones(termo) {
   )
 }
 
-function normalizar(texto) {
-  return String(texto || '')
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .trim()
-}
+/** A mesma comparação das tags: sem acento e sem caixa. */
+const normalizar =(texto) => tagKey(texto).trim()

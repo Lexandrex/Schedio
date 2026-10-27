@@ -7,6 +7,7 @@ import {
   isIcon,
   isImage,
   isScreen,
+  isShape,
   screenContaining,
 } from './elements.js'
 import {
@@ -19,7 +20,14 @@ import {
   triggerOf,
 } from './connections.js'
 import { FONT_FAMILIES, measureText, textStyle } from './textMetrics.js'
-import { formatText, replaceText, selectedRange, selectionStyle } from './richText.js'
+import {
+  formatText,
+  isToggleOn,
+  replaceText,
+  selectedRange,
+  selectionStyle,
+  toggleFormat,
+} from './richText.js'
 import { createStore, useStore } from './store.js'
 
 const SEM_SELECAO = createStore(null)
@@ -39,6 +47,21 @@ function NumberField({ label, value, onChange, min, step, placeholder }) {
           if (!Number.isNaN(next)) onChange(next)
         }}
       />
+    </label>
+  )
+}
+
+function SelectField({ label, value, options, onChange }) {
+  return (
+    <label className="prop-field">
+      <span>{label}</span>
+      <select className="prop-select" value={value} onChange={(event) => onChange(event.target.value)}>
+        {options.map((item) => (
+          <option key={item.value} value={item.value}>
+            {item.label}
+          </option>
+        ))}
+      </select>
     </label>
   )
 }
@@ -117,18 +140,17 @@ const ALIGNMENTS = [
   },
 ]
 
+/** Botões de liga/desliga do texto; os valores ficam em `TOGGLES` (richText.js). */
+const ESTILOS = [
+  { key: 'fontWeight', label: 'N', title: 'Negrito (Ctrl+B)', style: { fontWeight: 700 } },
+  { key: 'fontStyle', label: 'I', title: 'Itálico (Ctrl+I)', style: { fontStyle: 'italic' } },
+  { key: 'textDecoration', label: 'S', title: 'Sublinhado (Ctrl+U)', style: { textDecoration: 'underline' } },
+]
+
 function TextFormatSection({ element, update, faixa, formatar, atual }) {
   const style = textStyle(element)
   const metrics = measureText(element)
   const { values, mixed } = atual
-
-  // Como no Word: se todo o trecho já está assim, desliga; senão (inclusive
-  // misto), liga em tudo.
-  const toggle = (key, onValue) => {
-    const offValue = key === 'textDecoration' ? 'none' : 'normal'
-    formatar({ [key]: !mixed.has(key) && values[key] === onValue ? offValue : onValue })
-  }
-  const ativo = (key, onValue) => !mixed.has(key) && values[key] === onValue
 
   return (
     <>
@@ -164,7 +186,7 @@ function TextFormatSection({ element, update, faixa, formatar, atual }) {
         <p className="prop-hint">
           {metrics.isAutoSize
             ? 'Ajustando ao conteúdo. Ao definir uma largura, o texto quebra sozinho para caber.'
-            : `Conteúdo refluido em ${metrics.lines.length} linha(s).`}
+            : `Conteúdo refluido em ${metrics.rows.length} linha(s).`}
         </p>
 
         {!metrics.isAutoSize && (
@@ -244,27 +266,16 @@ function TextFormatSection({ element, update, faixa, formatar, atual }) {
         <div className="prop-field">
           <span>Estilo</span>
           <div className="format-group">
-            <ToggleButton
-              active={ativo('fontWeight', 'bold')}
-              onClick={() => toggle('fontWeight', 'bold')}
-              label="N"
-              title="Negrito (Ctrl+B)"
-              style={{ fontWeight: 700 }}
-            />
-            <ToggleButton
-              active={ativo('fontStyle', 'italic')}
-              onClick={() => toggle('fontStyle', 'italic')}
-              label="I"
-              title="Itálico (Ctrl+I)"
-              style={{ fontStyle: 'italic' }}
-            />
-            <ToggleButton
-              active={ativo('textDecoration', 'underline')}
-              onClick={() => toggle('textDecoration', 'underline')}
-              label="S"
-              title="Sublinhado (Ctrl+U)"
-              style={{ textDecoration: 'underline' }}
-            />
+            {ESTILOS.map((item) => (
+              <ToggleButton
+                key={item.key}
+                active={isToggleOn(atual, item.key)}
+                onClick={() => update(toggleFormat(element, faixa, item.key))}
+                label={item.label}
+                title={item.title}
+                style={item.style}
+              />
+            ))}
           </div>
         </div>
 
@@ -339,40 +350,24 @@ function ConnectionSection({ connection, elements, onUpdate, onDelete }) {
       <section className="prop-section">
         <h3>Interação</h3>
 
-        <label className="prop-field">
-          <span>Gatilho</span>
-          <select
-            className="prop-select"
-            value={trigger}
-            onChange={(event) => update({ trigger: event.target.value })}
-          >
-            {TRIGGERS.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <SelectField
+          label="Gatilho"
+          value={trigger}
+          options={TRIGGERS}
+          onChange={(value) => update({ trigger: value })}
+        />
 
         {trigger === 'hover' && (
           <p className="prop-hint">Ao tirar o mouse de cima, volta para onde estava.</p>
         )}
 
         {trigger === 'scroll' && (
-          <label className="prop-field">
-            <span>Direção</span>
-            <select
-              className="prop-select"
-              value={directionOf(connection)}
-              onChange={(event) => update({ direction: event.target.value })}
-            >
-              {SCROLL_DIRECTIONS.map((item) => (
-                <option key={item.value} value={item.value}>
-                  {item.label}
-                </option>
-              ))}
-            </select>
-          </label>
+          <SelectField
+            label="Direção"
+            value={directionOf(connection)}
+            options={SCROLL_DIRECTIONS}
+            onChange={(value) => update({ direction: value })}
+          />
         )}
 
         {trigger === 'delay' && (
@@ -385,20 +380,12 @@ function ConnectionSection({ connection, elements, onUpdate, onDelete }) {
           />
         )}
 
-        <label className="prop-field">
-          <span>Transição</span>
-          <select
-            className="prop-select"
-            value={connection.transition}
-            onChange={(event) => update({ transition: event.target.value })}
-          >
-            {TRANSITIONS.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <SelectField
+          label="Transição"
+          value={connection.transition}
+          options={TRANSITIONS}
+          onChange={(value) => update({ transition: value })}
+        />
 
         {connection.transition === 'smart' && (
           <p className="prop-hint">
@@ -630,7 +617,7 @@ export default function PropertiesPanel({
           />
         )}
 
-        {hasBox(element) && !isImage(element) && !isIcon(element) && (
+        {(isScreen(element) || isShape(element)) && (
           <>
             <ColorField label="Borda" value={element.stroke} onChange={(stroke) => update({ stroke })} />
             <NumberField

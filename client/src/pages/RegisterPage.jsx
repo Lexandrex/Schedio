@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, useOutletContext } from 'react-router-dom'
-import { authRequest } from '../api.js'
+import { apiRequest, authRequest } from '../api.js'
 import TermsDialog from '../components/TermsDialog.jsx'
 
 export default function RegisterPage() {
@@ -18,9 +18,7 @@ export default function RegisterPage() {
   async function openTerms() {
     try {
       // Sempre relê: se o texto mudou desde a última abertura, é o novo que vale.
-      const response = await fetch('/api/termos')
-      if (!response.ok) throw new Error()
-      const data = await response.json()
+      const data = await apiRequest('/api/termos')
       if (acceptedVersion && acceptedVersion !== data.versao) setAcceptedVersion(null)
       setTerms(data)
       setShowTerms(true)

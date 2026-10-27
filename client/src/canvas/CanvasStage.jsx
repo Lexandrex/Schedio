@@ -7,22 +7,26 @@ import {
   createScreen,
   createShape,
   createText,
-  isHidden,
   isLocked,
   isScreen,
   normalizeRect,
   screenContaining,
+  visibleElements,
 } from './elements.js'
 import { connectionAnchors } from './connections.js'
 import { onFontsLoaded } from './textMetrics.js'
+import { clampZoom } from './view.js'
 import CanvasElement from './CanvasElement.jsx'
 import TextEditor from './TextEditor.jsx'
 
-const MIN_ZOOM = 0.15
-const MAX_ZOOM = 4
 const MIN_SIZE = 4
 const HANDLES = ['nw', 'ne', 'se', 'sw']
-const DEFAULT_SCREEN = { width: 360, height: 640 }
+/** Tamanho de quem nasce de um clique simples, sem arrastar: tela de celular e forma média. */
+const DEFAULT_SIZE = {
+  [TOOLS.screen]: { width: 360, height: 640 },
+  [TOOLS.rect]: { width: 160, height: 100 },
+  [TOOLS.ellipse]: { width: 160, height: 100 },
+}
 
 export default function CanvasStage({
   elements,
@@ -117,10 +121,7 @@ export default function CanvasStage({
   function moverPinca(drag) {
     const agora = medirPinca()
     if (!agora) return
-    const zoom = Math.min(
-      MAX_ZOOM,
-      Math.max(MIN_ZOOM, drag.origin.zoom * (agora.distancia / drag.distancia)),
-    )
+    const zoom = clampZoom(drag.origin.zoom * (agora.distancia / drag.distancia))
     const ratio = zoom / drag.origin.zoom
     // O ponto do mapa que estava entre os dedos no começo continua entre eles.
     onViewChange({
@@ -161,8 +162,7 @@ export default function CanvasStage({
 
     // Ferramenta de ligação: primeiro clique escolhe a origem, segundo o destino.
     if (tool === TOOLS.connect) {
-      if (targetId) onConnectPick(targetId)
-      else onConnectPick(null)
+      onConnectPick(targetId || null)
       return
     }
 
@@ -172,7 +172,7 @@ export default function CanvasStage({
       return
     }
 
-    if (tool === TOOLS.screen || tool === TOOLS.rect || tool === TOOLS.ellipse) {
+    if (DEFAULT_SIZE[tool]) {
       const rect = normalizeRect(point.x, point.y, point.x, point.y)
       dragRef.current = { mode: 'create', start: point, type: tool, rect }
       setDraft({ ...rect, type: tool })
@@ -348,24 +348,18 @@ export default function CanvasStage({
 
     if (drag?.mode === 'create') {
       const { rect, type } = drag
-      const width = Math.max(Math.round(rect.width), 0)
-      const height = Math.max(Math.round(rect.height), 0)
-      const tooSmall = width < MIN_SIZE || height < MIN_SIZE
       const x = Math.round(rect.x)
       const y = Math.round(rect.y)
+      const arrastado = { width: Math.round(rect.width), height: Math.round(rect.height) }
+      // Clique simples (ou arraste mínimo) cria no tamanho padrão do tipo.
+      const tooSmall = arrastado.width < MIN_SIZE || arrastado.height < MIN_SIZE
+      const { width, height } = tooSmall ? DEFAULT_SIZE[type] : arrastado
 
-      if (type === TOOLS.screen) {
-        // Clique simples cria uma tela no formato de celular.
-        onCreate(
-          tooSmall
-            ? createScreen(x, y, DEFAULT_SCREEN.width, DEFAULT_SCREEN.height)
-            : createScreen(x, y, width, height),
-        )
-      } else {
-        onCreate(
-          tooSmall ? createShape(type, x, y, 160, 100) : createShape(type, x, y, width, height),
-        )
-      }
+      onCreate(
+        type === TOOLS.screen
+          ? createScreen(x, y, width, height)
+          : createShape(type, x, y, width, height),
+      )
     }
 
     setDraft(null)
@@ -410,7 +404,7 @@ export default function CanvasStage({
       const pointerX = event.clientX - rect.left
       const pointerY = event.clientY - rect.top
       const factor = event.deltaY < 0 ? 1.1 : 1 / 1.1
-      const zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, view.zoom * factor))
+      const zoom = clampZoom(view.zoom * factor)
       const ratio = zoom / view.zoom
 
       onViewChange({
@@ -425,7 +419,7 @@ export default function CanvasStage({
   }, [view, onViewChange])
 
   // Camada oculta não desenha — nem ela, nem as ligações que passam por ela.
-  const visiveis = elements.filter((element) => !isHidden(element))
+  const visiveis = visibleElements(elements)
   const byId = new Map(visiveis.map((element) => [element.id, element]))
   // Telas ficam atrás; o resto desenha por cima.
   const screens = visiveis.filter(isScreen)
@@ -444,7 +438,12 @@ export default function CanvasStage({
     if (dono && clipsContent(dono)) recorteDe.set(element.id, dono.id)
   }
   const pendingElement = pendingFrom ? byId.get(pendingFrom) : null
+  const pendingBox = pendingElement && boxOf(pendingElement)
+  const selectedBox = selected && boxOf(selected)
   const cursor = tool === TOOLS.select ? 'default' : 'crosshair'
+  // A grade acompanha o zoom: células de 20 unidades do mapa, blocos de 100.
+  const cell = 20 * view.zoom
+  const block = 100 * view.zoom
 
   return (
     <>
@@ -461,36 +460,12 @@ export default function CanvasStage({
       onDrop={handleDrop}
     >
       <defs>
-        <pattern
-          id="grid-cell"
-          width={20 * view.zoom}
-          height={20 * view.zoom}
-          patternUnits="userSpaceOnUse"
-          x={view.x}
-          y={view.y}
-        >
-          <path
-            d={`M ${20 * view.zoom} 0 L 0 0 0 ${20 * view.zoom}`}
-            fill="none"
-            stroke="#332f38"
-            strokeWidth="1"
-          />
+        <pattern id="grid-cell" width={cell} height={cell} patternUnits="userSpaceOnUse" x={view.x} y={view.y}>
+          <path d={`M ${cell} 0 L 0 0 0 ${cell}`} fill="none" stroke="#332f38" strokeWidth="1" />
         </pattern>
-        <pattern
-          id="grid-block"
-          width={100 * view.zoom}
-          height={100 * view.zoom}
-          patternUnits="userSpaceOnUse"
-          x={view.x}
-          y={view.y}
-        >
-          <rect width={100 * view.zoom} height={100 * view.zoom} fill="url(#grid-cell)" />
-          <path
-            d={`M ${100 * view.zoom} 0 L 0 0 0 ${100 * view.zoom}`}
-            fill="none"
-            stroke="#413c47"
-            strokeWidth="1"
-          />
+        <pattern id="grid-block" width={block} height={block} patternUnits="userSpaceOnUse" x={view.x} y={view.y}>
+          <rect width={block} height={block} fill="url(#grid-cell)" />
+          <path d={`M ${block} 0 L 0 0 0 ${block}`} fill="none" stroke="#413c47" strokeWidth="1" />
         </pattern>
         <marker id="cx-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
           <path d="M 0 0 L 10 5 L 0 10 z" fill="#8f7fd4" />
@@ -597,17 +572,12 @@ export default function CanvasStage({
         })}
 
         {/* Ligação em construção seguindo o cursor */}
-        {pendingElement && cursorPoint && (
+        {pendingBox && cursorPoint && (
           <g pointerEvents="none">
-            <rect
-              {...boxOf(pendingElement)}
-              fill="none"
-              stroke="#c3b5ff"
-              strokeWidth={1.5 / view.zoom}
-            />
+            <rect {...pendingBox} fill="none" stroke="#c3b5ff" strokeWidth={1.5 / view.zoom} />
             <line
-              x1={boxOf(pendingElement).x + boxOf(pendingElement).width / 2}
-              y1={boxOf(pendingElement).y + boxOf(pendingElement).height / 2}
+              x1={pendingBox.x + pendingBox.width / 2}
+              y1={pendingBox.y + pendingBox.height / 2}
               x2={cursorPoint.x}
               y2={cursorPoint.y}
               stroke="#c3b5ff"
@@ -633,28 +603,23 @@ export default function CanvasStage({
         {selected && (
           <g pointerEvents="none">
             <rect
-              {...boxOf(selected)}
+              {...selectedBox}
               fill="none"
               stroke={isLocked(selected) ? '#e0c58a' : '#aaa1b5'}
               strokeWidth={1.5 / view.zoom}
               strokeDasharray={isLocked(selected) ? `${5 / view.zoom} ${4 / view.zoom}` : undefined}
             />
             {!isLocked(selected) && HANDLES.map((handle) => {
-              const box = boxOf(selected)
               const size = 8 / view.zoom
-              const positions = {
-                nw: { x: box.x, y: box.y },
-                ne: { x: box.x + box.width, y: box.y },
-                se: { x: box.x + box.width, y: box.y + box.height },
-                sw: { x: box.x, y: box.y + box.height },
-              }
-              const position = positions[handle]
+              // O canto sai das letras da alça: 'e' é a borda direita, 's' a de baixo.
+              const x = handle.includes('e') ? selectedBox.x + selectedBox.width : selectedBox.x
+              const y = handle.includes('s') ? selectedBox.y + selectedBox.height : selectedBox.y
               return (
                 <rect
                   key={handle}
                   data-handle={handle}
-                  x={position.x - size / 2}
-                  y={position.y - size / 2}
+                  x={x - size / 2}
+                  y={y - size / 2}
                   width={size}
                   height={size}
                   fill="#19181a"

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { apiRequest } from '../api.js'
+import { apiRequest, uploadImage } from '../api.js'
 import CanvasStage from '../canvas/CanvasStage.jsx'
 import CanvasToolbar from '../canvas/CanvasToolbar.jsx'
 import PropertiesPanel from '../canvas/PropertiesPanel.jsx'
@@ -22,6 +22,7 @@ import {
 } from '../canvas/elements.js'
 import { createConnection, pruneConnections } from '../canvas/connections.js'
 import { createStore, useStore } from '../canvas/store.js'
+import { DEFAULT_VIEW, clampZoom } from '../canvas/view.js'
 
 const AUTOSAVE_MS = 10000
 
@@ -44,6 +45,23 @@ const TOOL_SHORTCUTS = {
 
 /** Celular, em pé (mesmo corte do layout de celular no CSS) ou deitado. */
 const telaEstreita = () => window.matchMedia('(max-width: 760px), (max-height: 500px)').matches
+
+/** Tamanho visível do mapa, com uma reserva para antes de ele existir. */
+function tamanhoDoVisor() {
+  const viewport = document.querySelector('.canvas-viewport')
+  return { width: viewport?.clientWidth || 800, height: viewport?.clientHeight || 600 }
+}
+
+/** Lê as dimensões reais do arquivo para a imagem entrar no canvas sem distorcer. */
+async function medirImagem(file) {
+  try {
+    const bitmap = await createImageBitmap(file)
+    const escala = Math.min(1, 400 / bitmap.width)
+    return { width: Math.round(bitmap.width * escala), height: Math.round(bitmap.height * escala) }
+  } catch {
+    return { width: 300, height: 200 }
+  }
+}
 
 /** Coordenadas do mouse no mapa — o único que re-renderiza quando o mouse anda. */
 function Coordenadas({ store }) {
@@ -78,7 +96,7 @@ export default function CanvasPage() {
   const [isUploading, setIsUploading] = useState(false)
   const imagemInputRef = useRef(null)
   const capaInputRef = useRef(null)
-  const [view, setView] = useState({ x: 240, y: 160, zoom: 1 })
+  const [view, setView] = useState(DEFAULT_VIEW)
   // No celular os painéis abertos cobririam quase todo o mapa: começam recolhidos.
   const [painelIcones, setPainelIcones] = useState(() => !telaEstreita())
   const [painelCamadas, setPainelCamadas] = useState(() => !telaEstreita())
@@ -90,6 +108,8 @@ export default function CanvasPage() {
   const [isPublishing, setIsPublishing] = useState(false)
   const [savedAt, setSavedAt] = useState(null)
 
+  // Cópias do estado para callbacks estáveis, timers e ouvintes da janela, que
+  // precisam do valor atual sem se reinscrever a cada mudança.
   const elementsRef = useRef(elements)
   const connectionsRef = useRef(connections)
   const startScreenRef = useRef(startScreenId)
@@ -97,19 +117,10 @@ export default function CanvasPage() {
 
   useEffect(() => {
     elementsRef.current = elements
-  }, [elements])
-
-  useEffect(() => {
     connectionsRef.current = connections
-  }, [connections])
-
-  useEffect(() => {
     startScreenRef.current = startScreenId
-  }, [startScreenId])
-
-  useEffect(() => {
     dirtyRef.current = isDirty
-  }, [isDirty])
+  })
 
   useEffect(() => {
     apiRequest(`/api/projects/${id}`)
@@ -130,15 +141,14 @@ export default function CanvasPage() {
     try {
       await apiRequest(`/api/projects/${id}/conteudo`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        json: {
           conteudo: {
             version: 2,
             elements: elementsRef.current,
             connections: connectionsRef.current,
             startScreen: startScreenRef.current,
           },
-        }),
+        },
       })
       setIsDirty(false)
       setSavedAt(new Date())
@@ -160,11 +170,7 @@ export default function CanvasPage() {
       // Publica sempre o que está salvo: grava as alterações pendentes antes.
       if (dirtyRef.current && !(await save())) return
 
-      const data = await apiRequest(`/api/projects/${id}/status`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
-      })
+      const data = await apiRequest(`/api/projects/${id}/status`, { method: 'PATCH', json: { status } })
       setProject((current) => ({ ...current, status: data.project.status }))
       setError('')
     } catch (requestError) {
@@ -303,12 +309,12 @@ export default function CanvasPage() {
       const alvo = elementsRef.current.find((element) => element.id === elementId)
       if (!alvo) return
       const box = boxOf(alvo)
-      const viewport = document.querySelector('.canvas-viewport')
+      const visor = tamanhoDoVisor()
 
       setView((atual) => ({
         ...atual,
-        x: (viewport?.clientWidth || 800) / 2 - (box.x + box.width / 2) * atual.zoom,
-        y: (viewport?.clientHeight || 600) / 2 - (box.y + box.height / 2) * atual.zoom,
+        x: visor.width / 2 - (box.x + box.width / 2) * atual.zoom,
+        y: visor.height / 2 - (box.y + box.height / 2) * atual.zoom,
       }))
       selectElement(elementId)
     },
@@ -364,10 +370,10 @@ export default function CanvasPage() {
 
   /** Centro do que está visível, em coordenadas do mapa. */
   const centroVisivel = useCallback(() => {
-    const viewport = document.querySelector('.canvas-viewport')
+    const visor = tamanhoDoVisor()
     return {
-      x: ((viewport?.clientWidth || 800) / 2 - view.x) / view.zoom,
-      y: ((viewport?.clientHeight || 600) / 2 - view.y) / view.zoom,
+      x: (visor.width / 2 - view.x) / view.zoom,
+      y: (visor.height / 2 - view.y) / view.zoom,
     }
   }, [view])
 
@@ -388,74 +394,46 @@ export default function CanvasPage() {
     [centroVisivel, createElement],
   )
 
-  /** Lê as dimensões reais do arquivo para a imagem entrar no canvas sem distorcer. */
-  async function medirImagem(file) {
-    try {
-      const bitmap = await createImageBitmap(file)
-      const escala = Math.min(1, 400 / bitmap.width)
-      return { width: Math.round(bitmap.width * escala), height: Math.round(bitmap.height * escala) }
-    } catch {
-      return { width: 300, height: 200 }
-    }
-  }
-
-  async function handleImageFile(event) {
+  /** Pega o arquivo escolhido e roda `enviar` com o indicador de envio e o erro tratados. */
+  async function receberArquivo(event, enviar) {
     const file = event.target.files?.[0]
     event.target.value = '' // permite reenviar o mesmo arquivo depois
     if (!file) return
 
     setIsUploading(true)
     setError('')
-
     try {
+      await enviar(file)
+    } catch (requestError) {
+      setError(requestError.message)
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
+  const handleImageFile = (event) =>
+    receberArquivo(event, async (file) => {
       const { width, height } = await medirImagem(file)
-      const form = new FormData()
-      form.append('imagem', file)
-
-      // Sem Content-Type manual: o browser precisa definir o boundary do multipart.
-      const data = await apiRequest(`/api/projects/${id}/imagens`, { method: 'POST', body: form })
-
+      const { image } = await uploadImage(`/api/projects/${id}/imagens`, file)
       // Posiciona no centro do que está visível no momento.
-      const viewport = document.querySelector('.canvas-viewport')
-      const centroX = ((viewport?.clientWidth || 800) / 2 - view.x) / view.zoom
-      const centroY = ((viewport?.clientHeight || 600) / 2 - view.y) / view.zoom
-
+      const centro = centroVisivel()
       createElement(
         createImage(
-          Math.round(centroX - width / 2),
-          Math.round(centroY - height / 2),
+          Math.round(centro.x - width / 2),
+          Math.round(centro.y - height / 2),
           width,
           height,
-          data.image.url,
-          data.image.id,
+          image.url,
+          image.id,
         ),
       )
-    } catch (requestError) {
-      setError(requestError.message)
-    } finally {
-      setIsUploading(false)
-    }
-  }
+    })
 
-  async function handleCapaFile(event) {
-    const file = event.target.files?.[0]
-    event.target.value = ''
-    if (!file) return
-
-    setIsUploading(true)
-    setError('')
-
-    try {
-      const form = new FormData()
-      form.append('imagem', file)
-      const data = await apiRequest(`/api/projects/${id}/capa`, { method: 'POST', body: form })
-      setProject((current) => ({ ...current, capa: data.capa }))
-    } catch (requestError) {
-      setError(requestError.message)
-    } finally {
-      setIsUploading(false)
-    }
-  }
+  const handleCapaFile = (event) =>
+    receberArquivo(event, async (file) => {
+      const { capa } = await uploadImage(`/api/projects/${id}/capa`, file)
+      setProject((current) => ({ ...current, capa }))
+    })
 
   useEffect(() => {
     function handleKeyDown(event) {
@@ -684,7 +662,7 @@ export default function CanvasPage() {
             <div className="canvas-zoom">
               <button
                 type="button"
-                onClick={() => setView((current) => ({ ...current, zoom: Math.max(0.15, current.zoom / 1.2) }))}
+                onClick={() => setView((current) => ({ ...current, zoom: clampZoom(current.zoom / 1.2) }))}
                 aria-label="Diminuir zoom"
               >
                 −
@@ -692,12 +670,12 @@ export default function CanvasPage() {
               <span>{Math.round(view.zoom * 100)}%</span>
               <button
                 type="button"
-                onClick={() => setView((current) => ({ ...current, zoom: Math.min(4, current.zoom * 1.2) }))}
+                onClick={() => setView((current) => ({ ...current, zoom: clampZoom(current.zoom * 1.2) }))}
                 aria-label="Aumentar zoom"
               >
                 +
               </button>
-              <button type="button" onClick={() => setView({ x: 240, y: 160, zoom: 1 })}>
+              <button type="button" onClick={() => setView(DEFAULT_VIEW)}>
                 Centralizar
               </button>
             </div>

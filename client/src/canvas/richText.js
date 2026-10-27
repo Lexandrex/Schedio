@@ -164,6 +164,26 @@ export function selectionStyle(element, faixa) {
 }
 
 /** Uma faixa selecionada dentro do texto, ou null. Exposto para o painel. */
-export function selectedRange(element, faixa) {
-  return faixaValida(element, faixa)
+export const selectedRange = faixaValida
+
+/** Estilos de liga/desliga: o valor ligado e o de volta ao normal. */
+export const TOGGLES = {
+  fontWeight: ['bold', 'normal'],
+  fontStyle: ['italic', 'normal'],
+  textDecoration: ['underline', 'none'],
+}
+
+/** O estilo `key` está ligado em toda a faixa (não vale se for misto)? */
+export function isToggleOn(estilo, key) {
+  return !estilo.mixed.has(key) && estilo.values[key] === TOGGLES[key][0]
+}
+
+/**
+ * Liga ou desliga um estilo na faixa, como no Word: se toda ela já está
+ * assim, desliga; senão (inclusive misto), liga em tudo. Devolve o patch.
+ */
+export function toggleFormat(element, faixa, key) {
+  const [ligado, desligado] = TOGGLES[key]
+  const valor = isToggleOn(selectionStyle(element, faixa), key) ? desligado : ligado
+  return formatText(element, faixa, { [key]: valor })
 }
