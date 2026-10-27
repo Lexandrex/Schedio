@@ -43,4 +43,13 @@ async function destroyImage(publicId) {
   await cloudinary.uploader.destroy(publicId, { resource_type: 'image' });
 }
 
-module.exports = { isConfigured, storageStatus, uploadBuffer, destroyImage, FOLDER };
+/**
+ * Apaga em segundo plano, sem falhar: quem chama já concluiu o que importava
+ * (o banco mudou), e um arquivo que ficou para trás não deve virar erro.
+ */
+async function destroyQuietly(...publicIds) {
+  if (!isConfigured) return;
+  await Promise.all(publicIds.map((publicId) => destroyImage(publicId).catch(() => {})));
+}
+
+module.exports = { isConfigured, storageStatus, uploadBuffer, destroyImage, destroyQuietly, FOLDER };

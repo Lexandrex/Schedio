@@ -1,16 +1,17 @@
 import { useEffect, useLayoutEffect, useRef } from 'react'
 import { CHAR_KEYS, charBase, fontMetrics, measureText, styledRanges, textStyle, verticalOffset } from './textMetrics.js'
-import { formatText, runsFromStyles, selectionStyle } from './richText.js'
+import { runsFromStyles, toggleFormat } from './richText.js'
 
 const HIGHLIGHT = 'schedio-selecao'
 const HISTORY_LIMIT = 200
 /** Teclas digitadas em sequência viram um passo só de desfazer. */
 const COALESCE_MS = 800
 
+/** Ctrl+B/I/U: o estilo que cada tecla liga e desliga. */
 const SHORTCUTS = {
-  b: ['fontWeight', 'bold', 'normal'],
-  i: ['fontStyle', 'italic', 'normal'],
-  u: ['textDecoration', 'underline', 'none'],
+  b: 'fontWeight',
+  i: 'fontStyle',
+  u: 'textDecoration',
 }
 
 /** O que o DOM do editor está mostrando. Mudou isso, redesenha. */
@@ -39,14 +40,17 @@ function renderContent(div, element, zoom) {
 
   for (const range of styledRanges(element)) {
     if (range.end <= range.start) continue
+    const { fill, fontSize, fontFamily, fontWeight, fontStyle, textDecoration } = range.style
     const span = document.createElement('span')
     span.dataset.estilo = JSON.stringify(range.style)
-    span.style.color = range.style.fill
-    span.style.fontSize = `${range.style.fontSize * zoom}px`
-    span.style.fontFamily = range.style.fontFamily
-    span.style.fontWeight = range.style.fontWeight
-    span.style.fontStyle = range.style.fontStyle
-    span.style.textDecoration = range.style.textDecoration
+    Object.assign(span.style, {
+      color: fill,
+      fontSize: `${fontSize * zoom}px`,
+      fontFamily,
+      fontWeight,
+      fontStyle,
+      textDecoration,
+    })
     span.textContent = text.slice(range.start, range.end)
     fragment.appendChild(span)
   }
@@ -437,21 +441,16 @@ export default function TextEditor({ element, view, onChange, onSelectionChange,
       avisarSelecao(selecao)
       // Com o cursor parado não há o que formatar.
       if (selecao.start === selecao.end) return
-      const [campo, ligado, desligado] = atalho
-      const { values, mixed } = selectionStyle(element, selecao)
-      const proximo = !mixed.has(campo) && values[campo] === ligado ? desligado : ligado
       origemRef.current = 'formatacao'
-      onChange(formatText(element, selecao, { [campo]: proximo }))
+      onChange(toggleFormat(element, selecao, atalho))
     }
   }
 
   function handleInput(event) {
     const tipo = event.nativeEvent?.inputType || ''
-    sincronizar(tipo.startsWith('insertText') || tipo === 'insertCompositionText'
-      ? 'digitacao'
-      : tipo.startsWith('delete')
-        ? 'digitacao-apagar'
-        : 'edicao')
+    if (tipo.startsWith('insertText') || tipo === 'insertCompositionText') sincronizar('digitacao')
+    else if (tipo.startsWith('delete')) sincronizar('digitacao-apagar')
+    else sincronizar('edicao')
   }
 
   function handleBlur(event) {

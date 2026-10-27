@@ -47,17 +47,13 @@ export default function EditorPage() {
   // Prévia do que o campo vira: o usuário vê as tags já separadas enquanto digita.
   const tagsDoForm = useMemo(() => parseTags(form?.tags), [form])
 
-  function openNewProject() {
-    setForm({ id: null, titulo: '', tags: '', descricao: '' })
-    setFormError('')
-  }
-
-  function openEditProject(project) {
+  /** Abre o formulário vazio ou, com um projeto, preenchido para edição. */
+  function openForm(project = null) {
     setForm({
-      id: project.id,
-      titulo: project.titulo,
-      tags: project.categoria || '',
-      descricao: project.descricao || '',
+      id: project?.id ?? null,
+      titulo: project?.titulo ?? '',
+      tags: project?.categoria || '',
+      descricao: project?.descricao || '',
     })
     setFormError('')
   }
@@ -66,6 +62,9 @@ export default function EditorPage() {
     setForm(null)
     setFormError('')
   }
+
+  /** `onChange` de um campo do formulário. */
+  const field = (name) => (event) => setForm((current) => ({ ...current, [name]: event.target.value }))
 
   /** Remove uma tag da lista sem mexer nas outras (o campo é um texto só). */
   function removeTag(alvo) {
@@ -89,26 +88,16 @@ export default function EditorPage() {
     setIsSaving(true)
     setFormError('')
 
-    const corpo = JSON.stringify({ titulo: form.titulo, categoria, descricao: form.descricao })
-
     try {
-      if (form.id) {
-        const data = await apiRequest(`/api/projects/${form.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: corpo,
-        })
-        setProjects((current) =>
-          current.map((project) => (project.id === form.id ? data.project : project)),
-        )
-      } else {
-        const data = await apiRequest('/api/projects', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: corpo,
-        })
-        setProjects((current) => [data.project, ...current])
-      }
+      const { project: salvo } = await apiRequest(form.id ? `/api/projects/${form.id}` : '/api/projects', {
+        method: form.id ? 'PATCH' : 'POST',
+        json: { titulo: form.titulo, categoria, descricao: form.descricao },
+      })
+      setProjects((current) =>
+        form.id
+          ? current.map((project) => (project.id === form.id ? salvo : project))
+          : [salvo, ...current],
+      )
       closeForm()
     } catch (requestError) {
       setFormError(requestError.message)
@@ -123,11 +112,7 @@ export default function EditorPage() {
     setError('')
 
     try {
-      const data = await apiRequest(`/api/projects/${project.id}/status`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
-      })
+      const data = await apiRequest(`/api/projects/${project.id}/status`, { method: 'PATCH', json: { status } })
       setProjects((current) =>
         current.map((item) => (item.id === project.id ? { ...item, status: data.project.status } : item)),
       )
@@ -167,7 +152,7 @@ export default function EditorPage() {
           onChange={(event) => setSearch(event.target.value)}
         />
 
-        <button className="new-project-button" type="button" onClick={openNewProject}>
+        <button className="new-project-button" type="button" onClick={() => openForm()}>
           <span aria-hidden="true">+</span> Novo projeto
         </button>
 
@@ -245,7 +230,7 @@ export default function EditorPage() {
                           ? 'Torne o projeto privado para editar os dados dele.'
                           : 'Editar título, descrição e tags'
                       }
-                      onClick={() => openEditProject(project)}
+                      onClick={() => openForm(project)}
                     >
                       Editar
                     </button>
@@ -310,9 +295,7 @@ export default function EditorPage() {
                   required
                   autoFocus
                   value={form.titulo}
-                  onChange={(event) =>
-                    setForm((current) => ({ ...current, titulo: event.target.value }))
-                  }
+                  onChange={field('titulo')}
                 />
               </label>
 
@@ -322,9 +305,7 @@ export default function EditorPage() {
                   type="text"
                   placeholder="Aventura, Ação, Mistério"
                   value={form.tags}
-                  onChange={(event) =>
-                    setForm((current) => ({ ...current, tags: event.target.value }))
-                  }
+                  onChange={field('tags')}
                   aria-describedby="tags-hint"
                 />
               </label>
@@ -356,9 +337,7 @@ export default function EditorPage() {
                   className="bio-textarea"
                   placeholder="Sobre o que é esse projeto?"
                   value={form.descricao}
-                  onChange={(event) =>
-                    setForm((current) => ({ ...current, descricao: event.target.value }))
-                  }
+                  onChange={field('descricao')}
                 />
               </label>
 

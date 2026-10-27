@@ -1,7 +1,13 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { formatText, replaceText, selectedRange, selectionStyle } from '../../client/src/canvas/richText.js'
+import {
+  formatText,
+  replaceText,
+  selectedRange,
+  selectionStyle,
+  toggleFormat,
+} from '../../client/src/canvas/richText.js'
 
 /** Texto simples, sem formatação mista. */
 const texto = (text, extra = {}) => ({
@@ -130,4 +136,31 @@ test('texto sem runs reporta o estilo do elemento, sem nada misto', () => {
   assert.equal(values.fill, '#ffffff')
   assert.equal(values.fontSize, 20)
   assert.equal(mixed.size, 0)
+})
+
+test('negrito numa faixa sem negrito liga só nela', () => {
+  const { runs } = toggleFormat(texto('Palavra'), { start: 0, end: 3 }, 'fontWeight')
+
+  assert.deepEqual(runs, [{ start: 0, end: 3, fontWeight: 'bold' }])
+})
+
+test('negrito numa faixa toda em negrito desliga', () => {
+  const elemento = texto('Palavra', { runs: [{ start: 0, end: 3, fontWeight: 'bold' }] })
+  const { runs } = toggleFormat(elemento, { start: 0, end: 3 }, 'fontWeight')
+
+  assert.equal(runs, undefined, 'voltou ao estilo do elemento')
+})
+
+test('faixa com negrito misto liga em tudo, como no Word', () => {
+  const elemento = texto('Palavra', { runs: [{ start: 0, end: 2, fontWeight: 'bold' }] })
+  const { runs } = toggleFormat(elemento, { start: 0, end: 4 }, 'fontWeight')
+
+  assert.deepEqual(runs, [{ start: 0, end: 4, fontWeight: 'bold' }])
+})
+
+test('sublinhado desliga para "none", não para "normal"', () => {
+  const elemento = texto('Palavra', { textDecoration: 'underline' })
+  const resultado = toggleFormat(elemento, null, 'textDecoration')
+
+  assert.equal(resultado.textDecoration, 'none')
 })

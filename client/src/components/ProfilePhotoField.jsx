@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { apiRequest } from '../api.js'
+import { apiRequest, uploadImage } from '../api.js'
 import Avatar from './Avatar.jsx'
 
 const MAX_BYTES = 5 * 1024 * 1024
@@ -29,11 +29,9 @@ export default function ProfilePhotoField({ foto, onChange, onFeedback }) {
       return
     }
 
-    const body = new FormData()
-    body.append('imagem', file)
     setIsBusy(true)
     try {
-      const data = await apiRequest('/api/users/me/foto', { method: 'POST', body })
+      const data = await uploadImage('/api/users/me/foto', file)
       onChange(data.foto)
       onFeedback({ message: 'Foto de perfil atualizada.', type: 'success' })
     } catch (error) {

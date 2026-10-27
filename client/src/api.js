@@ -23,26 +23,29 @@ async function handleResponse(response) {
   return data
 }
 
-export async function authRequest(endpoint, body) {
-  const response = await fetch(`/api/auth/${endpoint}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
+/**
+ * Chamada à API com o token da sessão. `json` vira o corpo da requisição já
+ * com o Content-Type certo; para enviar arquivo, passe um FormData em `body`
+ * (sem Content-Type manual: o navegador precisa definir o boundary).
+ */
+export async function apiRequest(path, { json, ...options } = {}) {
+  const token = getToken()
+  const headers = { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...options.headers }
+  if (json !== undefined) {
+    headers['Content-Type'] = 'application/json'
+    options.body = JSON.stringify(json)
+  }
 
-  return handleResponse(response)
+  return handleResponse(await fetch(path, { ...options, headers }))
 }
 
-export async function apiRequest(path, options = {}) {
-  const token = getToken()
+/** Envia uma imagem no campo `imagem`, que é o que as rotas de upload esperam. */
+export function uploadImage(path, file) {
+  const body = new FormData()
+  body.append('imagem', file)
+  return apiRequest(path, { method: 'POST', body })
+}
 
-  const response = await fetch(path, {
-    ...options,
-    headers: {
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options.headers,
-    },
-  })
-
-  return handleResponse(response)
+export function authRequest(endpoint, body) {
+  return apiRequest(`/api/auth/${endpoint}`, { method: 'POST', json: body })
 }

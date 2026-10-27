@@ -9,8 +9,32 @@ import { measureText, textStyle, verticalOffset } from './textMetrics.js'
  * `hitId` liga a área de clique (usada pelo editor para selecionar e pelo
  * simulador para disparar as conexões); sem ele o elemento é decorativo.
  */
+/** Área de clique transparente sobre a caixa — o desenho em si não recebe eventos. */
+function HitArea({ hitId, hitClassName, x, y, width, height }) {
+  return (
+    <rect
+      data-el={hitId || undefined}
+      className={hitClassName}
+      x={x}
+      y={y}
+      width={width}
+      height={height}
+      fill="transparent"
+    />
+  )
+}
+
+/** Alinhamento do texto → `text-anchor` do SVG e fração da largura onde a linha ancora. */
+const ANCORAS = {
+  left: ['start', 0],
+  center: ['middle', 0.5],
+  right: ['end', 1],
+}
+
 function CanvasElement({ element, hitId = null, hitClassName }) {
-  if (element.type === TOOLS.screen) {
+  const hit = { hitId, hitClassName }
+
+  if (element.type === TOOLS.screen || element.type === TOOLS.rect) {
     return (
       <rect
         data-el={hitId || undefined}
@@ -50,15 +74,7 @@ function CanvasElement({ element, hitId = null, hitClassName }) {
             pointerEvents="none"
           />
         </svg>
-        <rect
-          data-el={hitId || undefined}
-          className={hitClassName}
-          x={element.x}
-          y={element.y}
-          width={element.width}
-          height={element.height}
-          fill="transparent"
-        />
+        <HitArea {...hit} x={element.x} y={element.y} width={element.width} height={element.height} />
       </g>
     )
   }
@@ -76,34 +92,8 @@ function CanvasElement({ element, hitId = null, hitClassName }) {
           pointerEvents="none"
         />
         {/* Área de clique própria: <image> com href quebrado não recebe eventos. */}
-        <rect
-          data-el={hitId || undefined}
-          className={hitClassName}
-          x={element.x}
-          y={element.y}
-          width={element.width}
-          height={element.height}
-          fill="transparent"
-        />
+        <HitArea {...hit} x={element.x} y={element.y} width={element.width} height={element.height} />
       </g>
-    )
-  }
-
-  if (element.type === TOOLS.rect) {
-    return (
-      <rect
-        data-el={hitId || undefined}
-        className={hitClassName}
-        x={element.x}
-        y={element.y}
-        width={element.width}
-        height={element.height}
-        rx={element.radius}
-        fill={element.fill}
-        stroke={element.stroke}
-        strokeWidth={element.strokeWidth}
-        opacity={element.opacity}
-      />
     )
   }
 
@@ -126,27 +116,19 @@ function CanvasElement({ element, hitId = null, hitClassName }) {
 
   const style = textStyle(element)
   const metrics = measureText(element)
-  const anchor = style.textAlign === 'center' ? 'middle' : style.textAlign === 'right' ? 'end' : 'start'
-  const anchorX =
-    style.textAlign === 'center'
-      ? element.x + metrics.width / 2
-      : style.textAlign === 'right'
-        ? element.x + metrics.width
-        : element.x
-
+  const [anchor, fracao] = ANCORAS[style.textAlign] || ANCORAS.left
+  const anchorX = element.x + metrics.width * fracao
   const offsetY = verticalOffset(metrics, style)
 
   return (
     <g opacity={element.opacity}>
       {/* Área de clique do bloco inteiro, inclusive linhas vazias. */}
-      <rect
-        data-el={hitId || undefined}
-        className={hitClassName}
+      <HitArea
+        {...hit}
         x={element.x}
         y={element.y}
         width={Math.max(metrics.width, 8)}
         height={Math.max(metrics.height, element.fontSize)}
-        fill="transparent"
       />
       {/*
         Cada linha é uma sequência de trechos com estilo próprio (formatação por

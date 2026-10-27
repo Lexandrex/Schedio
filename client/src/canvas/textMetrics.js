@@ -91,15 +91,8 @@ export function verticalOffset(metrics, style) {
 
 /** Estilo de caractere do elemento: o que vale onde nenhum trecho diz outra coisa. */
 export function charBase(element) {
-  const style = textStyle(element)
-  return {
-    fill: element.fill,
-    fontSize: element.fontSize,
-    fontFamily: style.fontFamily,
-    fontWeight: style.fontWeight,
-    fontStyle: style.fontStyle,
-    textDecoration: style.textDecoration,
-  }
+  const { fontFamily, fontWeight, fontStyle, textDecoration } = textStyle(element)
+  return { fill: element.fill, fontSize: element.fontSize, fontFamily, fontWeight, fontStyle, textDecoration }
 }
 
 export function fontOf(style) {
@@ -350,10 +343,6 @@ function computeMeasure(element) {
 
   return {
     rows,
-    lines: rows.map((row) => row.text),
-    lineWidths: rows.map((row) => row.width),
-    lineHeight: style.lineHeight * element.fontSize,
-    contentWidth,
     contentHeight,
     width: maxWidth ?? contentWidth,
     height: element.height > 0 ? element.height : contentHeight,
