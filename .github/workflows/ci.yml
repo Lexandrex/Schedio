@@ -1,0 +1,77 @@
+# Pipeline de integração contínua do Schedio Drasis.
+#
+# Ordem: os dois jobs rodam em paralelo; qualquer passo que falhe (lint, build,
+# teste ou meta de cobertura) deixa o job vermelho e bloqueia o merge do PR.
+#
+# Gatilhos: todo push na main, todo pull request e à mão pela aba Actions
+# (workflow_dispatch). Para rodar SÓ à mão, apague `push` e `pull_request`.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Um push novo no mesmo branch cancela a execução anterior, que ficou velha.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: Frontend — lint e build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+
+  testes:
+    name: Testes e cobertura
+    runs-on: ubuntu-latest
+    # Postgres de verdade: os testes de API criam e apagam um banco por arquivo.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    # Não há .env no CI; o dotenv não acha arquivo e usa só estas variáveis.
+    env:
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: schedio
+      JWT_SECRET: segredo-de-ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # Roda a suite inteira sob o c8 e confere as metas: 75% backend, 25% frontend.
+      - run: npm run test:coverage
+      # O relatório sobe mesmo com a meta reprovada — é quando ele mais importa.
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cobertura
+          path: coverage/

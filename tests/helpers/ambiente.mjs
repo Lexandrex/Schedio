@@ -32,6 +32,7 @@ dotenv.config({ path: path.join(RAIZ, '.env') })
 
 const PREFIXO_BANCO = process.env.TEST_DB_NAME || 'schedio_teste'
 const STUB_EMAIL = path.join(RAIZ, 'tests', 'helpers', 'stub-email.cjs')
+const ENCERRAR = path.join(RAIZ, 'tests', 'helpers', 'encerrar-pelo-stdin.cjs')
 
 /** O código de verificação é forçado no banco — o e-mail de verdade não é lido. */
 export const CODIGO = '111111'
@@ -156,10 +157,10 @@ export async function iniciarAmbiente(sufixo = '') {
   const base = `http://127.0.0.1:${porta}`
   const log = []
 
-  const processo = spawn(process.execPath, ['--require', STUB_EMAIL, 'server.js'], {
+  const processo = spawn(process.execPath, ['--require', STUB_EMAIL, '--require', ENCERRAR, 'server.js'], {
     cwd: RAIZ,
     env: ambienteDoFilho(banco, porta),
-    stdio: ['ignore', 'pipe', 'pipe'],
+    stdio: ['pipe', 'pipe', 'pipe'],
   })
   processo.stdout.on('data', (parte) => log.push(String(parte)))
   processo.stderr.on('data', (parte) => log.push(String(parte)))
@@ -231,8 +232,13 @@ export async function iniciarAmbiente(sufixo = '') {
 
   async function encerrar() {
     await pool.end()
-    processo.kill()
-    await new Promise((pronto) => processo.once("exit", pronto))
+    // Fechar o stdin faz o servidor sair por process.exit(), que grava a
+    // cobertura; o kill fica só de reserva, se ele não sair em 5s.
+    const saiu = new Promise((pronto) => processo.once('exit', pronto))
+    processo.stdin.end()
+    const reserva = setTimeout(() => processo.kill(), 5000)
+    await saiu
+    clearTimeout(reserva)
     await apagarBanco(banco)
   }
 
