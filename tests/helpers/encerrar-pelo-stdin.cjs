@@ -4,7 +4,7 @@
  * `processo.kill()` não serve para isso: no Windows mata sem dar chance de
  * reação, e no Linux o SIGTERM padrão também derruba na hora. Nos dois casos o
  * V8 não grava a cobertura (`NODE_V8_COVERAGE`) e o `server.js` some do
- * relatório — justamente o arquivo que mais importa para a meta de 75%.
+ * relatório.
  *
  * `process.exit()` grava a cobertura antes de sair.
  */
