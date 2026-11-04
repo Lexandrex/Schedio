@@ -66,8 +66,15 @@ jobs:
         with:
           node-version: 22
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            client/package-lock.json
       - run: npm ci
-      # Roda a suite inteira sob o c8 e confere as metas: 75% backend, 25% frontend.
+      # O client tem o próprio package.json: Vitest e Testing Library moram lá.
+      - run: npm ci --prefix client
+      # Roda a suite inteira e confere as metas: 75% backend, 25% frontend.
+      # node:test sob o c8 (backend + módulos puros do client) e, em seguida,
+      # o Vitest com os testes de componente; o frontend soma os dois.
       - run: npm run test:coverage
       - uses: actions/upload-artifact@v4
         if: always()

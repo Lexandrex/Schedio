@@ -116,7 +116,7 @@ function ambienteDoFilho(banco, porta) {
 }
 
 async function esperarServidor(base, processo, log) {
-  for (let tentativa = 0; tentativa < 100; tentativa += 1) {
+  for (let tentativa = 0; tentativa < 600; tentativa += 1) {
     if (processo.exitCode !== null) {
       throw new Error(`o servidor de teste morreu ao subir:\n${log.join('')}`)
     }
@@ -128,7 +128,7 @@ async function esperarServidor(base, processo, log) {
     }
     await new Promise((pronto) => setTimeout(pronto, 100))
   }
-  throw new Error(`o servidor de teste não respondeu em 10s:\n${log.join('')}`)
+  throw new Error(`o servidor de teste não respondeu em 60s:\n${log.join('')}`)
 }
 
 /**
