@@ -2,11 +2,24 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import {
+  DEFAULT_FILL,
   REORDER,
+  TOOLS,
+  boxOf,
   childrenOfScreen,
   clipsContent,
+  createIcon,
+  createId,
+  createImage,
+  createScreen,
+  createShape,
+  createText,
   duplicateElement,
+  elementLabel,
+  hasBox,
+  isHidden,
   isInsideScreen,
+  isLocked,
   normalizeRect,
   reorderElement,
   screenContaining,
@@ -154,3 +167,98 @@ test('só a tela duplicada ganha " cópia" no nome; o conteúdo mantém o dele',
 test('duplicar id inexistente não cria nada', () => {
   assert.deepEqual(duplicateElement([forma('a', 0, 0)], 'nao-existe'), [])
 })
+
+test('cada elemento criado ganha um id próprio', () => {
+  const ids = new Set(Array.from({ length: 50 }, () => createId()))
+  assert.equal(ids.size, 50)
+})
+
+test('retângulo nasce arredondado; elipse, não', () => {
+  const ret = createShape(TOOLS.rect, 1, 2, 30, 40)
+  const eli = createShape(TOOLS.ellipse, 1, 2, 30, 40)
+
+  assert.deepEqual([ret.x, ret.y, ret.width, ret.height], [1, 2, 30, 40])
+  assert.equal(ret.radius, 8)
+  assert.equal(eli.radius, 0)
+  assert.equal(ret.fill, DEFAULT_FILL)
+  assert.equal(ret.opacity, 1)
+})
+
+test('texto novo se ajusta ao conteúdo: sem largura nem altura', () => {
+  const texto = createText(5, 6)
+
+  assert.equal(texto.type, TOOLS.text)
+  assert.equal(texto.text, 'Novo texto')
+  assert.equal(texto.width, null)
+  assert.equal(texto.height, null)
+})
+
+test('tela nova recorta o conteúdo e tem nome padrão', () => {
+  const semNome = createScreen(0, 0, 360, 640)
+  const comNome = createScreen(0, 0, 360, 640, 'Login')
+
+  assert.equal(semNome.name, 'Tela')
+  assert.equal(comNome.name, 'Login')
+  assert.equal(clipsContent(semNome), true)
+})
+
+test('imagem guarda a URL e o id da linha em `imagens`; ícone copia o desenho', () => {
+  const imagem = createImage(0, 0, 100, 50, 'https://exemplo.test/a.png', 7)
+  const icone = createIcon(0, 0, 24, 'casa', 'M0 0h24')
+
+  assert.equal(imagem.src, 'https://exemplo.test/a.png')
+  assert.equal(imagem.imageId, 7)
+  assert.deepEqual([icone.width, icone.height], [24, 24], 'ícone é quadrado')
+  assert.equal(icone.path, 'M0 0h24')
+})
+
+test('só texto não tem caixa explícita', () => {
+  assert.equal(hasBox(createShape(TOOLS.rect, 0, 0, 1, 1)), true)
+  assert.equal(hasBox(createScreen(0, 0, 1, 1)), true)
+  assert.equal(hasBox(createImage(0, 0, 1, 1, '', 1)), true)
+  assert.equal(hasBox(createIcon(0, 0, 1, 'x', '')), true)
+  assert.equal(hasBox(createText(0, 0)), false)
+  assert.deepEqual(boxOf(forma('a', 3, 4, 5, 6)), { x: 3, y: 4, width: 5, height: 6 })
+})
+
+test('rótulo na lista de camadas: apelido, conteúdo e, por último, o tipo', () => {
+  assert.equal(elementLabel({ ...forma('a', 0, 0), name: 'Botão' }), 'Botão')
+  assert.equal(elementLabel({ type: 'text', text: 'Primeira linha\nsegunda' }), 'Primeira linha')
+  assert.equal(elementLabel({ type: 'text', text: 'x'.repeat(40) }), 'x'.repeat(28), 'corta textos longos')
+  assert.equal(elementLabel({ type: 'text', text: '   ' }), 'Texto')
+  assert.equal(elementLabel({ type: 'icon', nome: 'casa' }), 'casa')
+  assert.equal(elementLabel({ type: 'icon' }), 'Ícone')
+  assert.equal(elementLabel({ type: 'ellipse' }), 'Elipse')
+  assert.equal(elementLabel({ type: 'desconhecido' }), 'desconhecido')
+})
+
+test('oculto e travado só valem quando marcados explicitamente', () => {
+  assert.equal(isHidden({ hidden: true }), true)
+  assert.equal(isHidden({ hidden: 'sim' }), false)
+  assert.equal(isLocked({ locked: true }), true)
+  assert.equal(isLocked({}), false)
+})
+
+test('topo e fundo levam até a ponta; direção inválida não mexe', () => {
+  const t = tela('t1', 0, 0, 100, 100)
+  const a = forma('a', 10, 10)
+  const b = forma('b', 20, 20)
+  const c = forma('c', 30, 30)
+  const elements = [t, a, b, c]
+
+  assert.deepEqual(reorderElement(elements, 'a', REORDER.topo).map((e) => e.id), ['t1', 'b', 'c', 'a'])
+  assert.deepEqual(reorderElement(elements, 'c', REORDER.fundo).map((e) => e.id), ['t1', 'c', 'a', 'b'])
+  assert.equal(reorderElement(elements, 'a', 'para-o-lado'), elements)
+  assert.equal(reorderElement(elements, 'nao-existe', REORDER.topo), elements)
+})
+
+test('telas se reordenam entre telas, sem misturar com o conteúdo', () => {
+  const t1 = tela('t1', 0, 0)
+  const t2 = tela('t2', 500, 0)
+  const dentro = forma('d', 10, 10)
+
+  const proximo = reorderElement([t1, dentro, t2], 't1', REORDER.frente)
+
+  assert.deepEqual(proximo.map((e) => e.id), ['t2', 'd', 't1'])
+})
+
