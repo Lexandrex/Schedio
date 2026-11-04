@@ -69,7 +69,6 @@ jobs:
       - run: npm ci
       # Roda a suite inteira sob o c8 e confere as metas: 75% backend, 25% frontend.
       - run: npm run test:coverage
-      # O relatório sobe mesmo com a meta reprovada — é quando ele mais importa.
       - uses: actions/upload-artifact@v4
         if: always()
         with:
