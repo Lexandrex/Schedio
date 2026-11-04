@@ -29,8 +29,11 @@ export default function TermsDialog({ terms, onAccept, onClose }) {
     let last = performance.now()
     const timer = setInterval(() => {
       const now = performance.now()
+      // O intervalo sai da closure antes: o React pode rodar a função do
+      // setElapsed só na renderização, quando `last` já é o próximo tique.
+      const delta = now - last
       if (document.visibilityState === 'visible') {
-        setElapsed((current) => Math.min(MIN_READ_MS, current + (now - last)))
+        setElapsed((current) => Math.min(MIN_READ_MS, current + delta))
       }
       last = now
     }, 200)
