@@ -1,0 +1,2 @@
+# Com CRLF, o bash quebra ao ler o script no Windows.
+*.sh text eol=lf
