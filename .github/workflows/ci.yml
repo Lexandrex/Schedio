@@ -1,22 +1,32 @@
-# Pipeline de integração contínua do Schedio Drasis.
+# Pipeline de CI/CD do Schedio Drasis.
 #
-# Ordem: os dois jobs rodam em paralelo; qualquer passo que falhe (lint, build,
-# teste ou meta de cobertura) deixa o job vermelho e bloqueia o merge do PR.
+# Ordem: `frontend` e `testes` rodam em paralelo; qualquer passo que falhe (lint,
+# build, teste ou meta de cobertura) deixa o job vermelho e bloqueia o merge do
+# PR. `deploy` só começa depois que os dois passam, e só na main.
 #
 # Gatilhos: todo push na main, todo pull request e à mão pela aba Actions
 # (workflow_dispatch). Para rodar SÓ à mão, apague `push` e `pull_request`.
-name: CI
+#
+# Rollback: Run workflow na main com `versao` = SHA completo ou tag de uma versão
+# antiga. O pipeline testa e publica aquela versão. Ver docs/deploy.md.
+name: CI/CD
 
 on:
   push:
     branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      versao:
+        description: 'SHA completo ou tag para publicar (vazio = o commit atual da main)'
+        required: false
+        type: string
 
-# Um push novo no mesmo branch cancela a execução anterior, que ficou velha.
+# Em branch de PR, um push novo cancela a execução anterior, que ficou velha.
+# Na main, a nova espera: cancelar poderia interromper um deploy pela metade.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   frontend:
@@ -26,7 +36,10 @@ jobs:
       run:
         working-directory: client
     steps:
+      # `inputs.versao` só existe no rollback; no resto, é o commit do evento.
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.versao || github.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -62,6 +75,8 @@ jobs:
       JWT_SECRET: segredo-de-ci
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.versao || github.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -81,3 +96,152 @@ jobs:
         with:
           name: cobertura
           path: coverage/
+
+  # Publica no Azure App Service. Nenhum passo usa SSH, FTP ou senha do Azure:
+  # o GitHub prova quem é por um token OIDC de curta duração (azure/login).
+  deploy:
+    name: Deploy em produção
+    needs: [frontend, testes]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    # Os secrets e vars abaixo são os do Environment, liberado só para a main.
+    environment:
+      name: producao
+      url: ${{ vars.APP_URL }}
+    permissions:
+      contents: read
+      id-token: write # permite pedir o token OIDC que o azure/login usa
+    env:
+      GRUPO: ${{ vars.AZURE_RESOURCE_GROUP }}
+      APP: ${{ vars.AZURE_APP_NAME }}
+      SERVIDOR_BANCO: ${{ vars.AZURE_DB_SERVER }}
+      APP_URL: ${{ vars.APP_URL }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.versao || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            client/package-lock.json
+
+      - name: Build do client
+        run: |
+          npm ci --prefix client
+          npm run build:client
+
+      - name: Dependências de produção do servidor
+        run: npm ci --omit=dev
+
+      # O smoke test lê este arquivo para provar qual commit está no ar. É um
+      # arquivo estático, então funciona também ao voltar para versões antigas.
+      - name: Gravar a versão no pacote
+        run: git rev-parse HEAD > client/dist/versao.txt
+
+      - name: Login no Azure (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # O firewall do banco só aceita serviços do Azure. O runner do GitHub é de
+      # fora, então ganha acesso só durante a migration, e só para o IP dele.
+      - name: Liberar o banco para este runner
+        id: liberar_banco
+        run: |
+          ip=$(curl -fsS https://api.ipify.org)
+          az postgres flexible-server firewall-rule create \
+            --resource-group "$GRUPO" --name "$SERVIDOR_BANCO" \
+            --rule-name runner-deploy \
+            --start-ip-address "$ip" --end-ip-address "$ip" \
+            --output none
+
+      # Antes de trocar o código: como as migrations são aditivas, a versão que
+      # está no ar continua funcionando com o banco já migrado.
+      - name: Migrations no banco de produção
+        run: npm run db:migrate
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      # `always()`: fecha o acesso mesmo se a migration falhar.
+      - name: Fechar o banco para o runner
+        if: ${{ always() && steps.liberar_banco.outcome != 'skipped' }}
+        run: |
+          az postgres flexible-server firewall-rule delete \
+            --resource-group "$GRUPO" --name "$SERVIDOR_BANCO" \
+            --rule-name runner-deploy --yes --output none
+
+      # O GitHub é a única fonte das configurações: mudar um segredo lá e rodar
+      # o pipeline atualiza o servidor. `--output none` não imprime os valores.
+      - name: Configurar o ambiente do App Service
+        run: |
+          az webapp config appsettings set \
+            --resource-group "$GRUPO" --name "$APP" --output none \
+            --settings \
+              NODE_ENV=production \
+              CLIENT_ORIGIN="$APP_URL" \
+              PASSWORD_RESET_URL="$APP_URL/reset-password" \
+              DATABASE_URL="$DATABASE_URL" \
+              JWT_SECRET="$JWT_SECRET" \
+              SMTP_HOST="$SMTP_HOST" \
+              SMTP_PORT="$SMTP_PORT" \
+              SMTP_SECURE="$SMTP_SECURE" \
+              SMTP_USER="$SMTP_USER" \
+              SMTP_PASS="$SMTP_PASS" \
+              SMTP_FROM="$SMTP_FROM" \
+              CLOUDINARY_CLOUD_NAME="$CLOUDINARY_CLOUD_NAME" \
+              CLOUDINARY_API_KEY="$CLOUDINARY_API_KEY" \
+              CLOUDINARY_API_SECRET="$CLOUDINARY_API_SECRET" \
+              CLOUDINARY_FOLDER="$CLOUDINARY_FOLDER"
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          SMTP_HOST: ${{ vars.SMTP_HOST }}
+          SMTP_PORT: ${{ vars.SMTP_PORT }}
+          SMTP_SECURE: ${{ vars.SMTP_SECURE }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          SMTP_FROM: ${{ vars.SMTP_FROM }}
+          CLOUDINARY_CLOUD_NAME: ${{ vars.CLOUDINARY_CLOUD_NAME }}
+          CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
+          CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET }}
+          CLOUDINARY_FOLDER: ${{ vars.CLOUDINARY_FOLDER }}
+
+      # Lista do que vai para o servidor: testes e fontes do client ficam fora.
+      - name: Empacotar
+        run: zip -r -q pacote.zip package.json ./*.js db scripts node_modules client/dist
+
+      - name: Publicar no App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ vars.AZURE_APP_NAME }}
+          package: pacote.zip
+
+      # Espera até 5 min pela versão nova. Falha se o commit no ar não for este,
+      # se o banco, o SMTP ou o Cloudinary estiverem fora, ou se faltar o schema:
+      # o e-mail inexistente força uma consulta real em `users` e deve dar 401.
+      - name: Smoke test
+        run: |
+          esperada=$(git rev-parse HEAD)
+          for tentativa in $(seq 1 30); do
+            versao=$(curl -fsS --max-time 10 "$APP_URL/versao.txt" || true)
+            saude=$(curl -fsS --max-time 10 "$APP_URL/api/health" || true)
+            login=$(curl -s --max-time 10 -o /dev/null -w '%{http_code}' \
+              -X POST "$APP_URL/api/auth/login" \
+              -H 'Content-Type: application/json' \
+              -d '{"email":"smoke-test@schedio.invalid","password":"x"}' || true)
+            if [ "$versao" = "$esperada" ] && [ "$login" = "401" ] && \
+               echo "$saude" | jq -e '.status == "ok" and .smtp == "configured" and .storage == "configured"' > /dev/null; then
+              echo "No ar: $versao"
+              echo "$saude"
+              exit 0
+            fi
+            echo "Tentativa $tentativa: versão=$versao login=$login saúde=$saude"
+            sleep 10
+          done
+          echo "::error::Smoke test falhou. Veja os logs do App Service (docs/deploy.md)."
+          exit 1

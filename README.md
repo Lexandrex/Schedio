@@ -21,6 +21,9 @@ Schedio Drasis
 - **Versão:**  
   1.0
 
+- **Deploy, rollback e monitoramento:**  
+  [docs/deploy.md](docs/deploy.md)
+
 ---
 
 # 1. Visão do Produto e Impacto (O Problema)
