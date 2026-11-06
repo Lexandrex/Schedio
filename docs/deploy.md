@@ -49,7 +49,8 @@ bash infra/provisionar.sh
 
 O script cria o banco, o App Service, os logs e a identidade do pipeline, e grava
 no Environment `producao` o que gera sozinho (`DATABASE_URL`, `JWT_SECRET` e os IDs
-do Azure). Nenhuma senha aparece na tela. Se o nome já estiver em uso no Azure,
+do Azure). Nenhuma senha aparece na tela. Se o seu login tiver mais de uma assinatura,
+escolha a do crédito de estudante: `ASSINATURA="Azure for Students" bash infra/provisionar.sh`. Se o nome já estiver em uso no Azure,
 rode com outros nomes: `APP=outro-nome BANCO_SERVIDOR=outro-nome-db bash infra/provisionar.sh`.
 
 Falta só o que vem de serviços de fora. Cada `gh secret set` pede o valor sem

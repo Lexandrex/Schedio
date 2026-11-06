@@ -33,6 +33,13 @@ segredo_existe() { gh secret list --repo "$REPO" --env "$AMBIENTE" --json name -
 gravar_segredo() { printf '%s' "$2" | gh secret set "$1" --repo "$REPO" --env "$AMBIENTE"; }
 gravar_variavel() { gh variable set "$1" --repo "$REPO" --env "$AMBIENTE" --body "$2"; }
 
+# Com mais de uma assinatura no mesmo login, escolha qual pagar a conta:
+#   ASSINATURA="Azure for Students" bash infra/provisionar.sh
+if [ -n "${ASSINATURA:-}" ]; then
+  az account set --subscription "$ASSINATURA"
+fi
+echo "== Assinatura: $(az_valor account show --query name)"
+
 echo "== Provedores de recurso do Azure"
 for provedor in Microsoft.Web Microsoft.DBforPostgreSQL Microsoft.OperationalInsights Microsoft.ManagedIdentity Microsoft.Insights; do
   az provider register --namespace "$provedor" --wait
