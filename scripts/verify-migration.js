@@ -1,18 +1,38 @@
 require('dotenv').config();
 
+// Importação das bibliotecas de sistema de arquivos
+const fs = require('fs');
+const path = require('path');
 const { pool } = require('../db');
 
 async function verify() {
-  const [tables, userColumns] = await Promise.all([
-    pool.query("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('users', 'pending_registrations') ORDER BY table_name"),
-    pool.query("SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'users' ORDER BY ordinal_position"),
-  ]);
-  console.log(JSON.stringify({ tables: tables.rows.map((row) => row.table_name), userColumns: userColumns.rows.map((row) => row.column_name) }));
-  await pool.end();
+  // Leitura dinâmica da pasta de migrations em vez de tabelas hardcoded
+  const directory = path.join(__dirname, '..', 'db', 'migrations');
+  const expected = fs.readdirSync(directory).filter((file) => file.endsWith('.sql')).sort();
+
+  let applied = [];
+  try {
+    const result = await pool.query('SELECT filename FROM schema_migrations ORDER BY filename');
+    applied = result.rows.map((row) => row.filename);
+  } catch (error) {
+    // Código 42P01 no Postgres significa "undefined_table" (a tabela não existe ainda)
+    if (error.code !== '42P01') throw error;
+  }
+
+  // Comparação entre o que existe nos arquivos e o que está no banco
+  const pendentes = expected.filter((file) => !applied.includes(file));
+  const semArquivo = applied.filter((file) => !expected.includes(file));
+  
+  console.log(JSON.stringify({ aplicadas: applied, pendentes, semArquivo }, null, 2));
+  
+  // Falha a execução do processo se houver migrations faltando, útil para CI/CD
+  if (pendentes.length) process.exitCode = 1;
 }
 
-verify().catch(async (error) => {
-  console.error(error.message);
-  await pool.end();
-  process.exitCode = 1;
-});
+verify()
+  .catch((error) => {
+    console.error(error.message);
+    process.exitCode = 1;
+  })
+  // Encerramento centralizado e garantido da conexão com o banco
+  .finally(() => pool.end());
