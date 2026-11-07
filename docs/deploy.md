@@ -228,7 +228,31 @@ validações, o dono é quem fez login e o banco do Azure continua fechado. Cada
 Curtidas, salvos e denúncias não vêm junto. Um título que já existe no destino é
 pulado, então rodar de novo não duplica.
 
-## 7. Desligar tudo
+## 7. Pausar e retomar
+
+*Actions → Pausar ou retomar produção → Run workflow*, escolhendo `pausar` ou
+`retomar` (`.github/workflows/producao.yml`). Só o dono do repositório consegue
+disparar, e push ou commit não rodam este workflow.
+
+| | No ar | Pausado |
+|---|---|---|
+| App Service | plano B1, Always On | parado, plano F1 gratuito |
+| PostgreSQL | ligado | parado (o disco continua) |
+| Custo | ~US$ 47/mês | ~US$ 7/mês |
+
+- **Não basta parar o app:** um App Service parado no B1 continua cobrando, porque
+  quem cobra é o plano. Por isso o plano desce para o F1.
+- **Retomar leva de 5 a 10 minutos,** quase tudo para o banco subir. O workflow só fica
+  verde quando o `/api/health` responde `ok`. Retome bem antes de apresentar.
+- **Checagem diária automática:** o Azure religa sozinho um banco parado há 7 dias.
+  Todo dia às 06:00 uma execução confere: com o site pausado, para o banco de novo;
+  com o site no ar, não faz nada. Ela nunca liga nem publica nada.
+- **Pausado, um push na `main` faz o deploy falhar** na migration, porque não há banco.
+  Retome antes de publicar.
+- **Monitor externo:** pause o monitor no UptimeRobot junto, senão ele manda alerta
+  de site fora do ar.
+
+## 8. Desligar tudo
 
 Depois da apresentação, para parar de consumir crédito. Apaga também o banco e todos
 os dados, sem volta:

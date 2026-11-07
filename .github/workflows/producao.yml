@@ -1,0 +1,122 @@
+# Pausa e retoma a produção para economizar crédito do Azure.
+#
+# Pausado: o App Service para e o plano desce para o F1 gratuito (o app parado
+# no B1 continuaria cobrando, porque quem cobra é o plano), e o PostgreSQL para.
+# Sobra só o disco do banco, ~US$ 7/mês em vez de ~US$ 47. Dados e configurações
+# ficam como estão.
+#
+# Gatilhos: só à mão (Actions → Pausar ou retomar produção → Run workflow) e
+# uma checagem diária. Push e commit não disparam este arquivo.
+#
+# A checagem existe porque o Azure religa sozinho um PostgreSQL parado há 7 dias.
+# Com o site pausado, ela para o banco de novo; com o site no ar, não faz nada.
+name: Pausar ou retomar produção
+
+on:
+  workflow_dispatch:
+    inputs:
+      acao:
+        description: 'O que fazer com a produção'
+        required: true
+        type: choice
+        options: [pausar, retomar]
+  schedule:
+    - cron: '0 9 * * *' # todo dia às 06:00 de Brasília
+
+# Uma operação de cada vez: pausar e retomar ao mesmo tempo se atropelariam.
+concurrency:
+  group: producao-pausa
+  cancel-in-progress: false
+
+jobs:
+  producao:
+    name: ${{ github.event_name == 'schedule' && 'Checagem diária' || inputs.acao }}
+    # À mão, só o dono do repositório, mesmo que entrem outros colaboradores.
+    if: github.event_name == 'schedule' || github.actor == github.repository_owner
+    runs-on: ubuntu-latest
+    # Mesma identidade do deploy: o Azure só a aceita vinda deste Environment.
+    environment: producao
+    permissions:
+      id-token: write
+    env:
+      GRUPO: ${{ vars.AZURE_RESOURCE_GROUP }}
+      APP: ${{ vars.AZURE_APP_NAME }}
+      SERVIDOR_BANCO: ${{ vars.AZURE_DB_SERVER }}
+      APP_URL: ${{ vars.APP_URL }}
+    steps:
+      - name: Login no Azure (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # Estado atual: plano F1 quer dizer "pausado". Os passos abaixo leem daqui.
+      - name: Ler o estado da produção
+        id: estado
+        run: |
+          plano=$(az webapp show -g "$GRUPO" -n "$APP" --query appServicePlanId -o tsv)
+          echo "plano=$plano" >> "$GITHUB_OUTPUT"
+          echo "sku=$(az appservice plan show --ids "$plano" --query sku.name -o tsv)" >> "$GITHUB_OUTPUT"
+          echo "banco=$(az postgres flexible-server show -g "$GRUPO" -n "$SERVIDOR_BANCO" --query state -o tsv)" >> "$GITHUB_OUTPUT"
+
+      # Ordem: parar o app antes do banco, para ninguém usar o site sem banco.
+      # O F1 não aceita Always On, por isso ele é desligado antes de descer.
+      - name: Pausar
+        if: inputs.acao == 'pausar'
+        env:
+          PLANO: ${{ steps.estado.outputs.plano }}
+          BANCO: ${{ steps.estado.outputs.banco }}
+        run: |
+          az webapp stop -g "$GRUPO" -n "$APP" -o none
+          az webapp config set -g "$GRUPO" -n "$APP" --always-on false -o none
+          az appservice plan update --ids "$PLANO" --sku F1 -o none
+          if [ "$BANCO" != "Stopped" ]; then
+            az postgres flexible-server stop -g "$GRUPO" -n "$SERVIDOR_BANCO" -o none
+          fi
+          echo "Produção pausada. Só o disco do banco continua cobrando."
+
+      # Ordem inversa: o banco sobe primeiro (é o que demora), depois o app.
+      - name: Retomar
+        if: inputs.acao == 'retomar'
+        env:
+          PLANO: ${{ steps.estado.outputs.plano }}
+          BANCO: ${{ steps.estado.outputs.banco }}
+        run: |
+          if [ "$BANCO" != "Ready" ]; then
+            az postgres flexible-server start -g "$GRUPO" -n "$SERVIDOR_BANCO" -o none
+          fi
+          az appservice plan update --ids "$PLANO" --sku B1 -o none
+          az webapp config set -g "$GRUPO" -n "$APP" --always-on true -o none
+          az webapp start -g "$GRUPO" -n "$APP" -o none
+
+      # Igual ao smoke test do deploy: só dá verde com o site respondendo de verdade.
+      - name: Conferir que o site voltou
+        if: inputs.acao == 'retomar'
+        run: |
+          for tentativa in $(seq 1 40); do
+            saude=$(curl -fsS --max-time 10 "$APP_URL/api/health" || true)
+            if echo "$saude" | jq -e '.status == "ok"' > /dev/null 2>&1; then
+              echo "No ar: $saude"
+              exit 0
+            fi
+            echo "Tentativa $tentativa: ainda não respondeu"
+            sleep 15
+          done
+          echo "::error::O site não respondeu em 10 minutos. Veja os logs do App Service (docs/deploy.md)."
+          exit 1
+
+      - name: Checagem diária
+        if: github.event_name == 'schedule'
+        env:
+          SKU: ${{ steps.estado.outputs.sku }}
+          BANCO: ${{ steps.estado.outputs.banco }}
+        run: |
+          if [ "$SKU" != "F1" ]; then
+            echo "Produção no ar (plano $SKU): nada a fazer."
+          elif [ "$BANCO" = "Ready" ]; then
+            echo "Produção pausada, mas o Azure religou o banco. Parando de novo."
+            az postgres flexible-server stop -g "$GRUPO" -n "$SERVIDOR_BANCO" -o none
+          else
+            echo "Produção pausada e banco $BANCO: nada a fazer."
+          fi
