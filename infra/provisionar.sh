@@ -64,7 +64,7 @@ if ! az postgres flexible-server show --resource-group "$GRUPO" --name "$BANCO_S
   az postgres flexible-server create \
     --resource-group "$GRUPO" --name "$BANCO_SERVIDOR" --location "$REGIAO" \
     --tier Burstable --sku-name Standard_B1ms --storage-size 32 --version 16 \
-    --backup-retention 7 --public-access None \
+    --backup-retention 7 --public-access Enabled \
     --admin-user "$BANCO_ADMIN" --admin-password "$SENHA_BANCO" \
     --yes --output none
 elif ! segredo_existe DATABASE_URL; then
@@ -81,6 +81,14 @@ if ! az postgres flexible-server db show --resource-group "$GRUPO" --server-name
 fi
 if [ -n "$SENHA_BANCO" ]; then
   gravar_segredo DATABASE_URL "postgresql://$BANCO_ADMIN:$SENHA_BANCO@$BANCO_SERVIDOR.postgres.database.azure.com:5432/$BANCO_NOME?sslmode=require"
+fi
+
+# Acesso pela rede pública ligado, mas quem entra é decidido pelo firewall, que
+# começa vazio. Corrige servidores criados com o acesso público desligado.
+if [ "$(az_valor postgres flexible-server show --resource-group "$GRUPO" --name "$BANCO_SERVIDOR" \
+      --query network.publicNetworkAccess)" != "Enabled" ]; then
+  az postgres flexible-server update --resource-group "$GRUPO" --name "$BANCO_SERVIDOR" \
+    --public-access Enabled --output none
 fi
 
 # 0.0.0.0 é a convenção do Azure para "só serviços dentro do Azure". Não é a
