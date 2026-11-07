@@ -190,7 +190,24 @@ O que `/api/health` responde por componente:
 | SMTP fora | `200`, `smtp: error`. O monitor por código HTTP **não** alerta, só os logs mostram |
 | Cloudinary sem configuração | `200`, `storage: not-configured` |
 
-## 6. Desligar tudo
+## 6. Levar projetos do desenvolvimento para produção
+
+```bash
+npm run projetos:importar -- https://schedio-drasis.azurewebsites.net
+```
+
+O script lê o banco do `.env` (desenvolvimento), lista os projetos de uma conta,
+pergunta quais copiar e faz login em produção com uma conta que já precisa existir
+e estar verificada lá. A senha não aparece na tela.
+
+Ele escreve em produção só pela API, como o editor faria. Assim valem as mesmas
+validações, o dono é quem fez login e o banco do Azure continua fechado. Cada imagem
+é baixada e enviada de novo, então produção ganha cópias próprias na pasta
+`schedio-drasis-prod`: apagar um projeto de um lado não apaga o arquivo do outro.
+Curtidas, salvos e denúncias não vêm junto. Um título que já existe no destino é
+pulado, então rodar de novo não duplica.
+
+## 7. Desligar tudo
 
 Depois da apresentação, para parar de consumir crédito. Apaga também o banco e todos
 os dados, sem volta:
