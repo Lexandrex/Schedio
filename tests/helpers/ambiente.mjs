@@ -2,9 +2,7 @@
  * Ambiente dos testes de API: um banco descartável e um servidor próprio.
  *
  * Nada aqui toca o banco de desenvolvimento. O banco de teste é criado do zero
- * a cada execução pelo runner de migrations de verdade (`scripts/migrate.js`),
- * o que faz cada rodada provar também que `db/migrations/` gera um schema que o
- * app consegue usar.
+ * a cada execução pelo runner de migrations de verdade (`scripts/migrate.js`).
  *
  * Três detalhes que fazem o isolamento funcionar:
  *
