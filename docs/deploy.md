@@ -161,6 +161,22 @@ só o código volta. Por isso a regra é migration aditiva (`ADD COLUMN ... DEFA
 código antigo continua funcionando com a coluna nova. O `db:migrate` da versão antiga
 não faz nada, porque tudo o que ela conhece já foi aplicado.
 
+### Teste realizado em 07/11/2026
+
+| Etapa | Execução | Duração | `/versao.txt` depois |
+|---|---|---|---|
+| Push na `main`, publicado sozinho | [42409039989](https://github.com/Lexandrex/Schedio/actions/runs/42409039989) | ~6 min | `b83ceb3` |
+| Rollback: Run workflow com `versao = 3d2c7ba` | [42409529631](https://github.com/Lexandrex/Schedio/actions/runs/42409529631) | 5 min 43 s | `3d2c7ba` |
+| Volta: Run workflow com `versao` vazia | [42410026573](https://github.com/Lexandrex/Schedio/actions/runs/42410026573) | 5 min 32 s | `b83ceb3` |
+
+O `/api/health` respondeu `ok`, com banco, SMTP e Cloudinary configurados, nas três
+versões. O site não saiu do ar durante as trocas.
+
+Uma tentativa anterior com o SHA curto falhou no `actions/checkout`, antes dos testes,
+e por isso não publicou nada
+([42408733026](https://github.com/Lexandrex/Schedio/actions/runs/42408733026)). Esse
+problema levou à criação do job `versao`.
+
 ## 5. Onde ver um erro de produção
 
 1. **Alerta:** o monitor externo avisa por e-mail quando `/api/health` para de responder.
