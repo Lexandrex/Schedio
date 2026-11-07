@@ -155,8 +155,8 @@ jobs:
         run: |
           ip=$(curl -fsS https://api.ipify.org)
           az postgres flexible-server firewall-rule create \
-            --resource-group "$GRUPO" --name "$SERVIDOR_BANCO" \
-            --rule-name runner-deploy \
+            --resource-group "$GRUPO" --server-name "$SERVIDOR_BANCO" \
+            --name runner-deploy \
             --start-ip-address "$ip" --end-ip-address "$ip" \
             --output none
 
@@ -172,8 +172,8 @@ jobs:
         if: ${{ always() && steps.liberar_banco.outcome != 'skipped' }}
         run: |
           az postgres flexible-server firewall-rule delete \
-            --resource-group "$GRUPO" --name "$SERVIDOR_BANCO" \
-            --rule-name runner-deploy --yes --output none
+            --resource-group "$GRUPO" --server-name "$SERVIDOR_BANCO" \
+            --name runner-deploy --yes --output none
 
       # O GitHub é a única fonte das configurações: mudar um segredo lá e rodar
       # o pipeline atualiza o servidor. `--output none` não imprime os valores.

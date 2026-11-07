@@ -57,8 +57,9 @@ if ! gh api "repos/$REPO/environments/$AMBIENTE/deployment-branch-policies" --jq
 fi
 
 echo "== PostgreSQL gerenciado (Burstable B1ms, 32 GB, backup de 7 dias)"
+# Hexadecimal: a senha pode entrar na DATABASE_URL sem precisar de escape.
+SENHA_BANCO=""
 if ! az postgres flexible-server show --resource-group "$GRUPO" --name "$BANCO_SERVIDOR" --output none 2>/dev/null; then
-  # Hexadecimal: pode entrar na DATABASE_URL sem precisar de escape.
   SENHA_BANCO=$(openssl rand -hex 24)
   az postgres flexible-server create \
     --resource-group "$GRUPO" --name "$BANCO_SERVIDOR" --location "$REGIAO" \
@@ -66,15 +67,26 @@ if ! az postgres flexible-server show --resource-group "$GRUPO" --name "$BANCO_S
     --backup-retention 7 --public-access None \
     --admin-user "$BANCO_ADMIN" --admin-password "$SENHA_BANCO" \
     --yes --output none
+elif ! segredo_existe DATABASE_URL; then
+  # O servidor existe, mas a senha nunca chegou ao GitHub (execução que parou no
+  # meio). Ninguém sabe a senha antiga, então troca por uma nova.
+  SENHA_BANCO=$(openssl rand -hex 24)
+  az postgres flexible-server update --resource-group "$GRUPO" --name "$BANCO_SERVIDOR" \
+    --admin-password "$SENHA_BANCO" --output none
+fi
+if ! az postgres flexible-server db show --resource-group "$GRUPO" --server-name "$BANCO_SERVIDOR" \
+    --name "$BANCO_NOME" --output none 2>/dev/null; then
   az postgres flexible-server db create \
-    --resource-group "$GRUPO" --server-name "$BANCO_SERVIDOR" --database-name "$BANCO_NOME" --output none
+    --resource-group "$GRUPO" --server-name "$BANCO_SERVIDOR" --name "$BANCO_NOME" --output none
+fi
+if [ -n "$SENHA_BANCO" ]; then
   gravar_segredo DATABASE_URL "postgresql://$BANCO_ADMIN:$SENHA_BANCO@$BANCO_SERVIDOR.postgres.database.azure.com:5432/$BANCO_NOME?sslmode=require"
 fi
 
 # 0.0.0.0 é a convenção do Azure para "só serviços dentro do Azure". Não é a
 # internet inteira: o resto continua bloqueado, e o pipeline abre o próprio IP.
 az postgres flexible-server firewall-rule create \
-  --resource-group "$GRUPO" --name "$BANCO_SERVIDOR" --rule-name servicos-azure \
+  --resource-group "$GRUPO" --server-name "$BANCO_SERVIDOR" --name servicos-azure \
   --start-ip-address 0.0.0.0 --end-ip-address 0.0.0.0 --output none
 
 echo "== App Service (Linux B1, Node 22)"
