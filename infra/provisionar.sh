@@ -83,6 +83,11 @@ if [ -n "$SENHA_BANCO" ]; then
   gravar_segredo DATABASE_URL "postgresql://$BANCO_ADMIN:$SENHA_BANCO@$BANCO_SERVIDOR.postgres.database.azure.com:5432/$BANCO_NOME?sslmode=require"
 fi
 
+# O Azure só deixa criar extensões que estejam nesta lista. A 001_users.sql usa a
+# pgcrypto; uma migration com extensão nova precisa entrar aqui antes.
+az postgres flexible-server parameter set --resource-group "$GRUPO" --server-name "$BANCO_SERVIDOR" \
+  --name azure.extensions --value pgcrypto --output none
+
 # Acesso pela rede pública ligado, mas quem entra é decidido pelo firewall, que
 # começa vazio. Corrige servidores criados com o acesso público desligado.
 if [ "$(az_valor postgres flexible-server show --resource-group "$GRUPO" --name "$BANCO_SERVIDOR" \
