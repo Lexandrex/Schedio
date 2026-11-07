@@ -1,14 +1,15 @@
 # Pipeline de CI/CD do Schedio Drasis.
 #
-# Ordem: `frontend` e `testes` rodam em paralelo; qualquer passo que falhe (lint,
+# Ordem: `versao` decide qual commit vale para a execução inteira; depois
+# `frontend` e `testes` rodam em paralelo, e qualquer passo que falhe (lint,
 # build, teste ou meta de cobertura) deixa o job vermelho e bloqueia o merge do
 # PR. `deploy` só começa depois que os dois passam, e só na main.
 #
 # Gatilhos: todo push na main, todo pull request e à mão pela aba Actions
 # (workflow_dispatch). Para rodar SÓ à mão, apague `push` e `pull_request`.
 #
-# Rollback: Run workflow na main com `versao` = SHA completo ou tag de uma versão
-# antiga. O pipeline testa e publica aquela versão. Ver docs/deploy.md.
+# Rollback: Run workflow na main com `versao` = SHA (curto ou completo) ou tag de
+# uma versão antiga. O pipeline testa e publica aquela versão. Ver docs/deploy.md.
 name: CI/CD
 
 on:
@@ -18,7 +19,7 @@ on:
   workflow_dispatch:
     inputs:
       versao:
-        description: 'SHA completo ou tag para publicar (vazio = o commit atual da main)'
+        description: 'SHA (curto ou completo) ou tag para publicar (vazio = o commit atual da main)'
         required: false
         type: string
 
@@ -29,17 +30,49 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
+  # Sem `versao` (push, PR, Run workflow vazio) é o commit do evento. Com ela, o
+  # SHA completo do commit pedido, desde que ele esteja na história da main: o
+  # actions/checkout não aceita SHA curto, e nada fora da main deve ir ao ar.
+  versao:
+    name: Versão a publicar
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.resolver.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        if: inputs.versao != ''
+        with:
+          fetch-depth: 0 # a história inteira, para achar commits antigos
+      - id: resolver
+        env:
+          VERSAO: ${{ inputs.versao }}
+        run: |
+          if [ -z "$VERSAO" ]; then
+            echo "sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! sha=$(git rev-parse --verify --quiet "$VERSAO^{commit}"); then
+            echo "::error::Versão '$VERSAO' não encontrada. Use um SHA (curto ou completo) ou uma tag."
+            exit 1
+          fi
+          if ! git merge-base --is-ancestor "$sha" origin/main; then
+            echo "::error::$sha não está na main. Só versões que passaram pela main podem ir ao ar."
+            exit 1
+          fi
+          echo "Versão a publicar: $sha"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
   frontend:
     name: Frontend — lint e build
+    needs: versao
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: client
     steps:
-      # `inputs.versao` só existe no rollback; no resto, é o commit do evento.
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.versao || github.sha }}
+          ref: ${{ needs.versao.outputs.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -51,6 +84,7 @@ jobs:
 
   testes:
     name: Testes e cobertura
+    needs: versao
     runs-on: ubuntu-latest
     # Postgres de verdade: os testes de API criam e apagam um banco por arquivo.
     services:
@@ -76,7 +110,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.versao || github.sha }}
+          ref: ${{ needs.versao.outputs.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -101,7 +135,8 @@ jobs:
   # o GitHub prova quem é por um token OIDC de curta duração (azure/login).
   deploy:
     name: Deploy em produção
-    needs: [frontend, testes]
+    # `versao` entra na lista só para o job poder ler o SHA que ela decidiu.
+    needs: [versao, frontend, testes]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     # Os secrets e vars abaixo são os do Environment, liberado só para a main.
@@ -119,7 +154,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.versao || github.sha }}
+          ref: ${{ needs.versao.outputs.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22

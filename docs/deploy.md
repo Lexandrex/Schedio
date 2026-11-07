@@ -139,9 +139,14 @@ de senha ficariam quebrados, e um `curl -f` não perceberia.
 ## 4. Rollback
 
 **Caminho rápido, sem mexer no histórico:** em *Actions → CI/CD → Run workflow*,
-branch `main`, preencha `versao` com o **SHA completo** ou uma tag de uma versão que
-já esteve no ar. Os SHAs ficam na lista de execuções e em *Deployments*. O SHA curto
-não funciona no `actions/checkout`.
+branch `main`, preencha `versao` com o SHA (curto, como `3d2c7ba`, ou completo) ou
+uma tag de uma versão que já esteve no ar. Os SHAs ficam na lista de execuções, em
+*Deployments* e no `git log --oneline`.
+
+O primeiro job, `versao`, transforma o que foi digitado no SHA completo, porque o
+`actions/checkout` só aceita o completo. Ele também recusa um commit que não esteja
+na história da `main`: só vai ao ar o que passou por ela. Os outros jobs usam esse
+SHA, então testes e deploy rodam sobre exatamente o mesmo commit.
 
 **Caminho padrão:** `git revert <commit>` e push na `main`. O pipeline publica o estado
 anterior. É o que deve ficar valendo: o próximo push na `main` passa por cima de um
