@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { apiRequest } from '../api.js'
 import AccountMenu from '../components/AccountMenu.jsx'
+import Avisos from '../components/Avisos.jsx'
 import CategoryTabs from '../components/CategoryTabs.jsx'
 import { BookmarkIcon, LikeCount } from '../components/InteractionIcons.jsx'
 import { useProjectFilter } from '../projectFilter.js'
@@ -49,6 +50,8 @@ export default function HomePage() {
           <Link to="/conta">Conta</Link>
         </AccountMenu>
       </header>
+
+      <Avisos />
 
       <CategoryTabs
         categories={categories}

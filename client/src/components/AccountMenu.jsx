@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import Avatar from './Avatar.jsx'
 
@@ -37,6 +38,8 @@ export default function AccountMenu({ children }) {
         <div className="avatar-dropdown" role="menu" onClick={() => setMenuOpen(false)}>
           <p className="avatar-dropdown-email">{user.email}</p>
           {children}
+          {/* Em todas as telas que têm o menu, sem cada página precisar lembrar. */}
+          {user.admin && <Link to="/admin">Administração</Link>}
           <button type="button" onClick={logout}>
             Sair
           </button>

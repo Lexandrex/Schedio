@@ -54,3 +54,15 @@ export function LikeCount({ likes }) {
     </span>
   )
 }
+
+/** Três pontos ligados: o "compartilhar" de costume. */
+export function ShareIcon({ size = 18 }) {
+  return (
+    <Icon size={size}>
+      <circle cx="6" cy="12" r="2.2" />
+      <circle cx="18" cy="6" r="2.2" />
+      <circle cx="18" cy="18" r="2.2" />
+      <path d="M8 11l8-4M8 13l8 4" />
+    </Icon>
+  )
+}

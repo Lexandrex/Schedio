@@ -2684,6 +2684,210 @@ a.editor-card-cover {
   overflow-wrap: anywhere;
 }
 
+/* Compartilhar a história (RF-41): ao lado do "Ler" */
+.detail-read-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.detail-read-row .detail-read {
+  margin-top: 0;
+}
+
+.detail-share {
+  height: 38px;
+}
+
+.detail-share-manual {
+  margin-top: 10px;
+}
+
+.detail-share-manual input {
+  height: 34px;
+  font-size: 0.74rem;
+}
+
+/* Avisos da plataforma (ex.: história excluída por má conduta) */
+.avisos {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 22px;
+}
+
+.aviso {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  padding: 12px 16px;
+  border: 1px solid #7a6a46;
+  border-radius: 10px;
+  background: #3d3527;
+  color: #f1e3c2;
+  font-size: 0.8rem;
+}
+
+.aviso p {
+  flex: 1 1 320px;
+  margin: 0;
+  line-height: 1.45;
+}
+
+.aviso .text-button {
+  margin-top: 0;
+  color: inherit;
+}
+
+/* Administração (RN-15) */
+.admin-title {
+  margin: 0 auto 0 0;
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.admin-tabs {
+  margin-bottom: 22px;
+}
+
+.admin-panel {
+  display: grid;
+  gap: 26px;
+  max-width: 860px;
+}
+
+.admin-section {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-section h2 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.admin-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-list > li {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-panel);
+}
+
+.admin-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.admin-row-info {
+  display: grid;
+  flex: 1;
+  gap: 3px;
+  min-width: 0;
+  font-size: 0.84rem;
+  overflow-wrap: anywhere;
+}
+
+.admin-row-info small {
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+}
+
+.admin-count {
+  display: grid;
+  place-items: center;
+  min-width: 38px;
+  height: 38px;
+  padding: 0 8px;
+  border: 1px solid #7a4646;
+  border-radius: 10px;
+  background: #4a2f31;
+  color: #f4d9d9;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-perigo {
+  color: #f4a3a3;
+}
+
+.admin-perigo:hover:not(:disabled) {
+  border-color: #7a4646;
+  color: #f4d9d9;
+}
+
+.admin-confirm {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid #7a4646;
+  border-radius: 10px;
+  background: rgb(74 47 49 / 45%);
+}
+
+.admin-confirm p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.admin-confirm label {
+  display: grid;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 0.74rem;
+}
+
+.admin-form {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.admin-form label {
+  display: grid;
+  flex: 1 1 260px;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 0.76rem;
+}
+
+.admin-form .primary-button {
+  margin-top: 0;
+  padding: 0 18px;
+  height: 42px;
+}
+
+.admin-feedback {
+  margin: 0;
+  text-align: left;
+}
+
+@media (max-width: 520px) {
+  .admin-row {
+    flex-wrap: wrap;
+  }
+
+  .admin-row-info {
+    flex-basis: calc(100% - 52px);
+  }
+}
+
 /* Responsive */
 @media (max-width: 520px), (orientation: landscape) and (max-height: 500px) {
   /* Fixa no canto, a marca cobriria o cartão quando ele ocupa a tela toda. */

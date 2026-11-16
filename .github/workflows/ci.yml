@@ -231,7 +231,8 @@ jobs:
               CLOUDINARY_CLOUD_NAME="$CLOUDINARY_CLOUD_NAME" \
               CLOUDINARY_API_KEY="$CLOUDINARY_API_KEY" \
               CLOUDINARY_API_SECRET="$CLOUDINARY_API_SECRET" \
-              CLOUDINARY_FOLDER="$CLOUDINARY_FOLDER"
+              CLOUDINARY_FOLDER="$CLOUDINARY_FOLDER" \
+              ADMIN_DONO_EMAIL="$ADMIN_DONO_EMAIL"
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
@@ -245,6 +246,8 @@ jobs:
           CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
           CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET }}
           CLOUDINARY_FOLDER: ${{ vars.CLOUDINARY_FOLDER }}
+          # Conta dona da plataforma: administradora que não perde o acesso.
+          ADMIN_DONO_EMAIL: ${{ vars.ADMIN_DONO_EMAIL }}
 
       # Lista do que vai para o servidor: testes e fontes do client ficam fora.
       - name: Empacotar

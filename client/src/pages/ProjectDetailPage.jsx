@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { apiRequest } from '../api.js'
 import { useAuth } from '../context/AuthContext.jsx'
-import { AlertIcon, BookmarkIcon, HeartIcon } from '../components/InteractionIcons.jsx'
+import { AlertIcon, BookmarkIcon, HeartIcon, ShareIcon } from '../components/InteractionIcons.jsx'
 import { screensOf } from '../canvas/elements.js'
 import { parseTags } from '../tags.js'
 
@@ -50,6 +50,27 @@ export default function ProjectDetailPage() {
   async function report() {
     if (await sendMark('denuncia', 'denuncia', 'POST')) setConfirmReport(false)
   }
+
+  // Compartilhar (RF-41): copia o endereço desta apresentação. Quem abre sem
+  // estar logado passa pelo login e volta para cá (routes/destino.js).
+  const linkDaHistoria = `${window.location.origin}/projeto/${id}`
+  const [copia, setCopia] = useState(null) // null | 'copiado' | 'manual'
+
+  async function compartilhar() {
+    try {
+      await navigator.clipboard.writeText(linkDaHistoria)
+      setCopia('copiado')
+    } catch {
+      // Sem a API (http fora do localhost, permissão negada): o link fica à mostra.
+      setCopia('manual')
+    }
+  }
+
+  useEffect(() => {
+    if (copia !== 'copiado') return undefined
+    const timer = setTimeout(() => setCopia(null), 2500)
+    return () => clearTimeout(timer)
+  }, [copia])
 
   if (isLoading) {
     return (
@@ -187,8 +208,8 @@ export default function ProjectDetailPage() {
             {project.descricao || 'Este projeto ainda não tem uma descrição.'}
           </p>
 
-          {telas.length > 0 ? (
-            <>
+          <div className="detail-read-row">
+            {telas.length > 0 && (
               <button
                 className="primary-button detail-read"
                 type="button"
@@ -196,15 +217,33 @@ export default function ProjectDetailPage() {
               >
                 Ler
               </button>
-              <p className="detail-hint">
-                {telas.length} {telas.length === 1 ? 'tela' : 'telas'} para navegar.
-              </p>
-            </>
-          ) : (
-            <p className="detail-hint">
-              O autor ainda não montou telas neste projeto, então não há o que navegar.
-            </p>
+            )}
+            {/* RF-41: o link desta apresentação, para a pessoa mandar a quem quiser. */}
+            <button
+              className={`detail-action detail-share${copia === 'copiado' ? ' active' : ''}`}
+              type="button"
+              title="Copiar o link desta história para compartilhar"
+              onClick={compartilhar}
+            >
+              <ShareIcon />
+              {copia === 'copiado' ? 'Link copiado!' : 'Compartilhar'}
+            </button>
+          </div>
+          <p className="sr-only" role="status">
+            {copia === 'copiado' ? 'Link da história copiado.' : ''}
+          </p>
+          {copia === 'manual' && (
+            <label className="detail-share-manual">
+              <span>Não foi possível copiar sozinho. Copie o link abaixo:</span>
+              <input type="text" readOnly value={linkDaHistoria} onFocus={(event) => event.target.select()} autoFocus />
+            </label>
           )}
+
+          <p className="detail-hint">
+            {telas.length > 0
+              ? `${telas.length} ${telas.length === 1 ? 'tela' : 'telas'} para navegar.`
+              : 'O autor ainda não montou telas neste projeto, então não há o que navegar.'}
+          </p>
         </div>
       </article>
     </div>

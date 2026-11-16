@@ -9,6 +9,7 @@ import ProjectReaderPage from './pages/ProjectReaderPage.jsx'
 import AccountPage from './pages/AccountPage.jsx'
 import ProfilePage from './pages/ProfilePage.jsx'
 import ConvitePage from './pages/ConvitePage.jsx'
+import AdminPage from './pages/AdminPage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import RegisterPage from './pages/RegisterPage.jsx'
 import VerifyEmailPage from './pages/VerifyEmailPage.jsx'
@@ -28,6 +29,7 @@ export default function App() {
         <Route path="conta" element={<AccountPage />} />
         <Route path="perfil/:id" element={<ProfilePage />} />
         <Route path="convite/:token" element={<ConvitePage />} />
+        <Route path="admin" element={<AdminPage />} />
       </Route>
 
       <Route element={<AuthLayout />}>

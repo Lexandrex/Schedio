@@ -56,7 +56,10 @@ test('excluir a conta guarda a cópia dela e dos projetos pelo prazo dos Termos'
 
   // As rotas de imagem dão 503 sem Cloudinary nos testes: os arquivos entram direto no banco.
   await amb.pool.query("UPDATE projetos SET capa = 'https://x/capa.png', capa_public_id = 'capa-1' WHERE id = $1", [publicado])
-  await amb.pool.query("INSERT INTO imagens (projeto_id, url, public_id) VALUES ($1, 'https://x/img.png', 'img-1')", [privado])
+  const { rows: [imagem] } = await amb.pool.query(
+    "INSERT INTO imagens (projeto_id, url, public_id) VALUES ($1, 'https://x/img.png', 'img-1') RETURNING id",
+    [privado],
+  )
   await amb.api(`/api/projects/${publicado}/like`, { method: 'PUT', token: leitor.token })
   await amb.api(`/api/users/${conta.id}/denuncia`, { method: 'POST', token: leitor.token })
 
@@ -77,7 +80,8 @@ test('excluir a conta guarda a cópia dela e dos projetos pelo prazo dos Termos'
   assert.equal(porTitulo.Publicado.likes, 1)
   assert.deepEqual(porTitulo.Publicado.conteudo, UMA_TELA, 'o estado do editor é guardado inteiro')
   assert.equal(porTitulo.Rascunho.status, 'privado')
-  assert.deepEqual(porTitulo.Rascunho.imagens, [{ url: 'https://x/img.png', public_id: 'img-1' }])
+  // Com o id: é por ele que o canvas restaurado acha a imagem (ver administracao.test.mjs).
+  assert.deepEqual(porTitulo.Rascunho.imagens, [{ id: imagem.id, url: 'https://x/img.png', public_id: 'img-1' }])
   assert.deepEqual([...copia.arquivos].sort(), ['capa-1', 'img-1'])
 })
 

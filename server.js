@@ -12,7 +12,7 @@ const { signToken, requireAuth } = require('./auth');
 const storage = require('./storage');
 const { MAX_TAGS_LENGTH, parseTags, formatTags } = require('./tags');
 const { TERMOS } = require('./termos');
-const { arquivarConta, expurgarContasVencidas } = require('./contasExcluidas');
+const { arquivarConta, restaurarConta, expurgarContasVencidas } = require('./contasExcluidas');
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
@@ -298,14 +298,26 @@ app.post('/api/auth/login', rota(async (request, response) => {
   return response.json({ user: { id: user.id, email: user.email }, token: signToken(user) });
 }));
 
+/**
+ * O dono da plataforma: administrador por configuração (`ADMIN_DONO_EMAIL`),
+ * não por coluna — por isso nenhuma rota consegue tirar o acesso dele.
+ */
+const emailDoDono = () => normalizarEmail(process.env.ADMIN_DONO_EMAIL || '') || null;
+
+/** `admin` e `dono` de uma linha de `users` (com `email` e `admin`). */
+function papelAdmin(user) {
+  const dono = Boolean(user.email && user.email === emailDoDono());
+  return { admin: dono || Boolean(user.admin), dono };
+}
+
 app.get('/api/auth/me', requireAuth, rota(async (request, response) => {
   const result = await query(
-    'SELECT id, email, nome, bio, foto, cor, termos_versao, termos_aceitos_em FROM users WHERE id = $1',
+    'SELECT id, email, nome, bio, foto, cor, termos_versao, termos_aceitos_em, admin FROM users WHERE id = $1',
     [request.userId],
   );
   const user = result.rows[0];
   if (!user) return response.status(401).json({ message: SESSAO_INVALIDA });
-  return response.json({ user });
+  return response.json({ user: { ...user, ...papelAdmin(user) } });
 }));
 
 const HEX_COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
@@ -333,7 +345,7 @@ app.patch('/api/users/me', requireAuth, rota(async (request, response) => {
 }));
 
 app.delete('/api/users/me', requireAuth, rota(async (request, response) => {
-  const result = await query('SELECT senha, foto_public_id FROM users WHERE id = $1', [request.userId]);
+  const result = await query('SELECT senha FROM users WHERE id = $1', [request.userId]);
   const user = result.rows[0];
   if (!user) return response.status(401).json({ message: SESSAO_INVALIDA });
 
@@ -341,12 +353,39 @@ app.delete('/api/users/me', requireAuth, rota(async (request, response) => {
     return response.status(401).json({ message: 'Senha incorreta.' });
   }
 
-  // Tudo numa transação: a cópia para `contas_excluidas` (prazo dos Termos)
-  // e a exclusão acontecem juntas ou nenhuma. Ver contasExcluidas.js.
+  await excluirConta(request.userId);
+  return response.status(204).send();
+}));
+
+/** Roda `trabalho(client)` numa transação: tudo ou nada. */
+async function emTransacao(trabalho) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    await arquivarConta(client, request.userId);
+    const resultado = await trabalho(client);
+    await client.query('COMMIT');
+    return resultado;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Exclui a conta: pela própria pessoa (/conta) ou por um administrador
+ * (`excluidaPor`, com `motivo`). Nos dois casos a cópia vai para
+ * `contas_excluidas` pelo prazo dos Termos; só a do administrador guarda o
+ * necessário para restaurar (ver contasExcluidas.js).
+ */
+async function excluirConta(userId, { excluidaPor = null, motivo = null } = {}) {
+  const foto = await query('SELECT foto_public_id FROM users WHERE id = $1', [userId]);
+
+  // Tudo numa transação: a cópia para `contas_excluidas` (prazo dos Termos)
+  // e a exclusão acontecem juntas ou nenhuma.
+  await emTransacao(async (client) => {
+    await arquivarConta(client, userId, { excluidaPor, motivo });
 
     // Os likes da conta saem junto com ela. Os projetos do próprio usuário
     // ficam de fora porque o cascade já os apaga. As denúncias, não: o
@@ -355,7 +394,7 @@ app.delete('/api/users/me', requireAuth, rota(async (request, response) => {
       `UPDATE projetos SET likes = GREATEST(likes - 1, 0)
        WHERE usuario_id <> $1
          AND id::text IN (SELECT jsonb_array_elements_text(likes) FROM users WHERE id = $1)`,
-      [request.userId],
+      [userId],
     );
 
     // Os arrays de `users` não têm FK: o cascade não tira deles os projetos
@@ -371,22 +410,15 @@ app.delete('/api/users/me', requireAuth, rota(async (request, response) => {
        WHERE users.id <> $1
          AND (likes ?| sumidos.ids OR salvos ?| sumidos.ids OR reportados ?| sumidos.ids
            OR criadores_reportados ? $1::uuid::text)`,
-      [request.userId],
+      [userId],
     );
 
-    await client.query('DELETE FROM users WHERE id = $1', [request.userId]);
-    await client.query('COMMIT');
-  } catch (error) {
-    await client.query('ROLLBACK');
-    throw error;
-  } finally {
-    client.release();
-  }
+    await client.query('DELETE FROM users WHERE id = $1', [userId]);
+  });
 
   // Como na exclusão de projeto: a conta já se foi.
-  await storage.destroyQuietly(user.foto_public_id);
-  return response.status(204).send();
-}));
+  await storage.destroyQuietly(foto.rows[0]?.foto_public_id);
+}
 
 /**
  * Perfil público de um criador: dados de apresentação e as obras dele.
@@ -616,8 +648,10 @@ app.get('/api/projects/:id/leitura', requireAuth, rota(async (request, response)
      FROM projetos p
      JOIN users u ON u.id = p.usuario_id
      LEFT JOIN users eu ON eu.id = $2
-     WHERE p.id = $1 AND p.status = 'publicado'`,
-    [request.params.id, request.userId],
+     WHERE p.id = $1 AND (p.status = 'publicado' OR eu.admin OR eu.email = $3)`,
+    // Administrador lê também o privado: uma obra denunciada pode ter sido
+    // tornada privada, e a avaliação (RN-15) precisa vê-la.
+    [request.params.id, request.userId, emailDoDono()],
   );
   if (!result.rows[0]) return response.status(404).json({ message: PROJETO_NAO_PUBLICADO });
   return response.json({ project: result.rows[0] });
@@ -1042,37 +1076,45 @@ app.delete('/api/users/me/foto', requireAuth, requireStorage, rota(async (reques
   return response.status(204).send();
 }));
 
-app.delete('/api/projects/:id', requireAuth, rota(async (request, response) => {
+/**
+ * Exclui um projeto: o dono pelo /editor (`donoId` filtra) ou um
+ * administrador (`donoId` null). Devolve `{ id, titulo, usuario_id }` do que
+ * saiu, ou null se não havia o que excluir.
+ */
+async function apagarProjeto(projectId, donoId = null) {
   // Os arquivos precisam ser coletados antes: o DELETE leva junto as linhas de `imagens`.
-  const aRemover = await query(
-    `SELECT p.capa_public_id, ARRAY_REMOVE(ARRAY_AGG(i.public_id), NULL) AS imagens
+  const alvo = await query(
+    `SELECT p.id, p.titulo, p.usuario_id, p.capa_public_id,
+            ARRAY_REMOVE(ARRAY_AGG(i.public_id), NULL) AS imagens
      FROM projetos p
      LEFT JOIN imagens i ON i.projeto_id = p.id
-     WHERE p.id = $1 AND p.usuario_id = $2
-     GROUP BY p.capa_public_id`,
-    [request.params.id, request.userId],
+     WHERE p.id = $1 AND ($2::uuid IS NULL OR p.usuario_id = $2::uuid)
+     GROUP BY p.id`,
+    [projectId, donoId],
   );
+  const projeto = alvo.rows[0];
+  if (!projeto) return null;
 
-  const result = await query(
-    'DELETE FROM projetos WHERE id = $1 AND usuario_id = $2',
-    [request.params.id, request.userId],
-  );
-  if (!result.rowCount) {
-    return response.status(404).json({ message: PROJETO_NAO_ENCONTRADO });
-  }
+  const result = await query('DELETE FROM projetos WHERE id = $1', [projeto.id]);
+  if (!result.rowCount) return null;
 
   // Os arrays de `users` guardam o id em texto, sem FK: o cascade não os alcança.
   await query(
     `UPDATE users
      SET likes = likes - $1::uuid::text, salvos = salvos - $1::uuid::text, reportados = reportados - $1::uuid::text
      WHERE likes ? $1::uuid::text OR salvos ? $1::uuid::text OR reportados ? $1::uuid::text`,
-    [request.params.id],
+    [projeto.id],
   );
 
   // O projeto já foi excluído: uma falha aqui não deve virar erro para o usuário.
-  const { capa_public_id: capa, imagens } = aRemover.rows[0] || {};
-  await storage.destroyQuietly(capa, ...(imagens || []));
+  await storage.destroyQuietly(projeto.capa_public_id, ...(projeto.imagens || []));
+  return { id: projeto.id, titulo: projeto.titulo, usuario_id: projeto.usuario_id };
+}
 
+app.delete('/api/projects/:id', requireAuth, rota(async (request, response) => {
+  if (!await apagarProjeto(request.params.id, request.userId)) {
+    return response.status(404).json({ message: PROJETO_NAO_ENCONTRADO });
+  }
   return response.status(204).send();
 }, PROJETO_NAO_ENCONTRADO));
 
@@ -1140,6 +1182,231 @@ app.post('/api/auth/password-recovery/reset', rota(async (request, response) => 
   );
   return response.json({ message: 'Senha atualizada com sucesso.' });
 }));
+
+/*
+ * Avisos à própria pessoa (ex.: uma história dela excluída por má conduta).
+ * A tela inicial e o /editor mostram os não lidos.
+ */
+app.get('/api/avisos', requireAuth, rota(async (request, response) => {
+  const result = await query(
+    'SELECT id, mensagem, criado_em FROM avisos WHERE usuario_id = $1 AND lido_em IS NULL ORDER BY criado_em',
+    [request.userId],
+  );
+  return response.json({ avisos: result.rows });
+}));
+
+app.post('/api/avisos/:id/lido', requireAuth, rota(async (request, response) => {
+  const result = await query(
+    'UPDATE avisos SET lido_em = COALESCE(lido_em, NOW()) WHERE id = $1 AND usuario_id = $2',
+    [request.params.id, request.userId],
+  );
+  if (!result.rowCount) return response.status(404).json({ message: 'Aviso não encontrado.' });
+  return response.status(204).send();
+}, 'Aviso não encontrado.'));
+
+/*
+ * Administração (RN-15): avaliar denúncias, excluir obras e contas por má
+ * conduta, restaurar contas encerradas pela moderação e gerenciar quem
+ * administra. Tudo exige `requireAdmin`; quem não é recebe 403.
+ */
+const SO_ADMIN = 'Acesso restrito a administradores.';
+const USUARIO_NAO_ENCONTRADO = 'Usuário não encontrado.';
+const NENHUMA_CONTA_COM_EMAIL = 'Nenhuma conta com esse e-mail.';
+const MAX_MOTIVO = 500;
+
+async function requireAdmin(request, response, next) {
+  try {
+    const result = await query('SELECT email, admin FROM users WHERE id = $1', [request.userId]);
+    const papel = result.rows[0] && papelAdmin(result.rows[0]);
+    if (!papel?.admin) return response.status(403).json({ message: SO_ADMIN });
+    request.ehDono = papel.dono;
+    return next();
+  } catch (error) {
+    return next(error);
+  }
+}
+
+const comAdmin = [requireAuth, requireAdmin];
+
+/** Motivo opcional que o administrador escreve; vai no aviso e no e-mail. */
+function motivoDe(body) {
+  const motivo = String(body?.motivo || '').trim();
+  if (motivo.length > MAX_MOTIVO) throw new ErroHttp(400, `Escreva o motivo em até ${MAX_MOTIVO} caracteres.`);
+  return motivo || null;
+}
+
+const comMotivo = (texto, motivo) => (motivo ? `${texto} Motivo: ${motivo}` : texto);
+
+/** E-mail de aviso que não pode atrasar nem derrubar a ação: sem SMTP, só não vai. */
+function avisarPorEmail(mensagem) {
+  if (!mailTransport) return;
+  enviarEmail(mensagem).catch((error) => console.error('Aviso por e-mail não enviado:', error.message));
+}
+
+/** Obras e criadores denunciados, dos mais denunciados para os menos. */
+app.get('/api/admin/denuncias', comAdmin, rota(async (_request, response) => {
+  const projects = await query(
+    `SELECT p.id, p.titulo, p.status, p.capa, p.denuncias, p.criado,
+            u.id AS autor_id, u.nome AS autor_nome, u.email AS autor_email
+     FROM projetos p JOIN users u ON u.id = p.usuario_id
+     WHERE p.denuncias > 0
+     ORDER BY p.denuncias DESC, p.criado DESC`,
+  );
+  const creators = await query(
+    `SELECT u.id, u.nome, u.email, u.denuncias, u.admin,
+            (SELECT COUNT(*)::int FROM projetos p WHERE p.usuario_id = u.id) AS projetos
+     FROM users u
+     WHERE u.denuncias > 0
+     ORDER BY u.denuncias DESC`,
+  );
+  return response.json({
+    projects: projects.rows,
+    creators: creators.rows.map((user) => ({ ...user, ...papelAdmin(user) })),
+  });
+}));
+
+/**
+ * Exclui uma obra por má conduta. O autor recebe um aviso na plataforma (e
+ * por e-mail, se houver SMTP) dizendo qual história saiu e por quê.
+ */
+app.delete('/api/admin/projetos/:id', comAdmin, rota(async (request, response) => {
+  const motivo = motivoDe(request.body);
+  const projeto = await apagarProjeto(request.params.id);
+  if (!projeto) return response.status(404).json({ message: PROJETO_NAO_ENCONTRADO });
+
+  const mensagem = comMotivo(
+    `Sua história "${projeto.titulo}" foi excluída por um administrador por má conduta (violação dos Termos de Uso).`,
+    motivo,
+  );
+  await query('INSERT INTO avisos (usuario_id, mensagem) VALUES ($1, $2)', [projeto.usuario_id, mensagem]);
+  const autor = await query('SELECT email FROM users WHERE id = $1', [projeto.usuario_id]);
+  avisarPorEmail({ to: autor.rows[0].email, subject: 'Uma história sua foi excluída — Schedio Drasis', text: mensagem });
+  return response.status(204).send();
+}, PROJETO_NAO_ENCONTRADO));
+
+/** Acha uma conta pelo e-mail, para excluir ou conferir. */
+app.get('/api/admin/usuarios', comAdmin, rota(async (request, response) => {
+  const email = normalizarEmail(String(request.query.email || ''));
+  if (!email) return response.status(400).json({ message: 'Informe o e-mail da conta.' });
+  const result = await query(
+    `SELECT u.id, u.nome, u.email, u.denuncias, u.admin,
+            (SELECT COUNT(*)::int FROM projetos p WHERE p.usuario_id = u.id) AS projetos
+     FROM users u WHERE u.email = $1`,
+    [email],
+  );
+  const user = result.rows[0];
+  if (!user) return response.status(404).json({ message: NENHUMA_CONTA_COM_EMAIL });
+  return response.json({ usuario: { ...user, ...papelAdmin(user) } });
+}));
+
+/**
+ * Encerra uma conta por má conduta. Segue os Termos como a autoexclusão — a
+ * cópia fica em `contas_excluidas` pelo prazo —, mas guarda também o
+ * necessário para restaurá-la. Ninguém exclui o dono nem a si mesmo por aqui,
+ * e só o dono exclui outro administrador.
+ */
+app.delete('/api/admin/usuarios/:id', comAdmin, rota(async (request, response) => {
+  const motivo = motivoDe(request.body);
+  if (request.params.id === request.userId) {
+    return response.status(400).json({ message: 'Para excluir a sua própria conta, use a página da conta.' });
+  }
+  const result = await query('SELECT id, email, admin FROM users WHERE id = $1', [request.params.id]);
+  const alvo = result.rows[0];
+  if (!alvo) return response.status(404).json({ message: USUARIO_NAO_ENCONTRADO });
+
+  const papel = papelAdmin(alvo);
+  if (papel.dono) {
+    return response.status(400).json({ message: 'A conta do dono da plataforma não pode ser excluída.' });
+  }
+  if (papel.admin && !request.ehDono) {
+    return response.status(403).json({ message: 'Só o dono da plataforma exclui a conta de outro administrador.' });
+  }
+
+  await excluirConta(alvo.id, { excluidaPor: request.userId, motivo });
+
+  avisarPorEmail({
+    to: alvo.email,
+    subject: 'Sua conta foi encerrada — Schedio Drasis',
+    text: comMotivo(
+      `Sua conta no Schedio Drasis foi encerrada por um administrador por má conduta (violação dos Termos de Uso). Conforme os Termos, uma cópia dela fica guardada por ${TERMOS.retencaoContaExcluidaMeses} meses, e a conta pode ser restaurada nesse prazo se a avaliação concluir que o encerramento foi indevido.`,
+      motivo,
+    ),
+  });
+  return response.status(204).send();
+}, USUARIO_NAO_ENCONTRADO));
+
+/** Cópias de contas excluídas ainda no prazo, das mais recentes para as mais antigas. */
+app.get('/api/admin/contas-excluidas', comAdmin, rota(async (_request, response) => {
+  const result = await query(
+    `SELECT c.id, c.usuario_id, c.email, c.nome, c.denuncias, c.excluida_em, c.expira_em, c.motivo,
+            jsonb_array_length(c.projetos) AS projetos,
+            c.restauracao IS NOT NULL AS restauravel,
+            c.excluida_por, a.nome AS excluida_por_nome, a.email AS excluida_por_email
+     FROM contas_excluidas c
+     LEFT JOIN users a ON a.id = c.excluida_por
+     WHERE c.expira_em > NOW()
+     ORDER BY c.excluida_em DESC`,
+  );
+  return response.json({ contas: result.rows });
+}));
+
+app.post('/api/admin/contas-excluidas/:id/restaurar', comAdmin, rota(async (request, response) => {
+  const resultado = await emTransacao((client) => restaurarConta(client, request.params.id));
+  if (resultado.recusa) {
+    return response.status(resultado.recusa.status).json({ message: resultado.recusa.message });
+  }
+
+  const { usuario } = resultado;
+  await query('INSERT INTO avisos (usuario_id, mensagem) VALUES ($1, $2)', [
+    usuario.id,
+    'Sua conta foi restaurada por um administrador. Seus projetos voltaram como estavam; a foto de perfil precisa ser enviada de novo.',
+  ]);
+  avisarPorEmail({
+    to: usuario.email,
+    subject: 'Sua conta foi restaurada — Schedio Drasis',
+    text: 'Sua conta no Schedio Drasis foi restaurada por um administrador. Você já pode entrar com o mesmo e-mail e a mesma senha.',
+  });
+  return response.json(resultado);
+}, 'Conta excluída não encontrada ou já expirada.'));
+
+/** Quem administra: o dono primeiro, depois na ordem em que receberam o acesso. */
+app.get('/api/admin/admins', comAdmin, rota(async (_request, response) => {
+  const result = await query(
+    `SELECT id, nome, email, admin, admin_desde FROM users
+     WHERE admin OR email = $1
+     ORDER BY (email = $1) DESC NULLS LAST, admin_desde`,
+    [emailDoDono()],
+  );
+  return response.json({ admins: result.rows.map((user) => ({ ...user, ...papelAdmin(user) })) });
+}));
+
+/** Concede o acesso pelo e-mail. Conceder de novo a quem já tem não muda nada. */
+app.post('/api/admin/admins', comAdmin, rota(async (request, response) => {
+  const email = normalizarEmail(String(request.body.email || ''));
+  if (!email) return response.status(400).json({ message: 'Informe o e-mail da conta.' });
+  const result = await query(
+    `UPDATE users SET admin = true, admin_desde = COALESCE(admin_desde, NOW())
+     WHERE email = $1
+     RETURNING id, nome, email, admin, admin_desde`,
+    [email],
+  );
+  const user = result.rows[0];
+  if (!user) return response.status(404).json({ message: NENHUMA_CONTA_COM_EMAIL });
+  return response.json({ admin: { ...user, ...papelAdmin(user) } });
+}));
+
+/** Revoga o acesso. O dono não perde: ele é administrador pela configuração. */
+app.delete('/api/admin/admins/:id', comAdmin, rota(async (request, response) => {
+  const result = await query('SELECT email, admin FROM users WHERE id = $1', [request.params.id]);
+  const alvo = result.rows[0];
+  if (alvo && papelAdmin(alvo).dono) {
+    return response.status(400).json({ message: 'O dono da plataforma não perde o acesso de administrador.' });
+  }
+  if (!alvo?.admin) return response.status(404).json({ message: 'Administrador não encontrado.' });
+
+  await query('UPDATE users SET admin = false, admin_desde = NULL WHERE id = $1', [request.params.id]);
+  return response.status(204).send();
+}, 'Administrador não encontrado.'));
 
 app.get(/^(?!\/api\/).*/, (_request, response) => {
   response.sendFile(path.join(clientDist, 'index.html'));

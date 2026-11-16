@@ -17,8 +17,8 @@
 const RETENCAO_CONTA_EXCLUIDA_MESES = 6;
 
 const TERMOS = {
-  versao: '1.1',
-  vigenciaDesde: '2026-10-26',
+  versao: '1.2',
+  vigenciaDesde: '2026-11-16',
   titulo: 'Termos de Uso e Política de Privacidade',
   retencaoContaExcluidaMeses: RETENCAO_CONTA_EXCLUIDA_MESES,
   secoes: [
@@ -60,7 +60,8 @@ const TERMOS = {
       paragrafos: [
         'Você pode, a qualquer momento, confirmar a existência de tratamento, acessar e corrigir seus dados, solicitar informações sobre compartilhamento e pedir a eliminação dos seus dados, nos termos do art. 18 da LGPD.',
         'Os dados de perfil podem ser corrigidos na própria página da conta. A exclusão da conta, também disponível nessa página, remove imediatamente da Plataforma seu cadastro, seu perfil público e seus projetos, que deixam de ser acessíveis a qualquer usuário.',
-        `Uma cópia do estado da conta no momento da exclusão — e-mail, nome de usuário, o registro de aceite destes Termos, o número de denúncias recebidas e cada projeto com seu conteúdo, status e imagens — é guardada de forma restrita por até ${RETENCAO_CONTA_EXCLUIDA_MESES} meses, prazo inspirado na guarda de registros de aplicações prevista no art. 15 do Marco Civil da Internet. A cópia serve apenas à apuração de denúncias, ao atendimento de requisições de autoridades e ao exercício regular de direitos (arts. 7º, VI, e 16, I, da LGPD), não é exibida na Plataforma e não permite reativar a conta. Vencido o prazo, ela é apagada definitivamente, junto com as imagens.`,
+        `Uma cópia do estado da conta no momento da exclusão — e-mail, nome de usuário, o registro de aceite destes Termos, o número de denúncias recebidas e cada projeto com seu conteúdo, status e imagens — é guardada de forma restrita por até ${RETENCAO_CONTA_EXCLUIDA_MESES} meses, prazo inspirado na guarda de registros de aplicações prevista no art. 15 do Marco Civil da Internet. A cópia serve apenas à apuração de denúncias, ao atendimento de requisições de autoridades e ao exercício regular de direitos (arts. 7º, VI, e 16, I, da LGPD), não é exibida na Plataforma e só é acessível aos administradores. Vencido o prazo, ela é apagada definitivamente, junto com as imagens.`,
+        `A conta que você mesmo excluir não pode ser reativada. Já a conta encerrada pela Plataforma por violação destes Termos (seção 10) tem a cópia acrescida do necessário para restaurá-la — o hash da senha, a descrição e a cor do perfil, e as curtidas, os salvos e as denúncias que você fez —, e pode ser restaurada pela Plataforma dentro do mesmo prazo de ${RETENCAO_CONTA_EXCLUIDA_MESES} meses, por exemplo quando a avaliação concluir que o encerramento foi indevido. A foto de perfil é apagada no encerramento e não volta com a restauração.`,
         'Registros cuja guarda por prazo maior seja exigida por lei ou por ordem judicial poderão ser mantidos pelo tempo exigido.',
       ],
     },
@@ -100,6 +101,7 @@ const TERMOS = {
       paragrafos: [
         'Qualquer usuário pode denunciar um projeto publicado ou um criador. A denúncia não pode ser desfeita, não identifica quem denunciou a quem foi denunciado e é registrada para avaliação posterior.',
         'A Plataforma pode, a seu critério e sem aviso prévio, remover ou tornar privado qualquer conteúdo que viole estes Termos ou a lei, bem como suspender ou encerrar contas envolvidas, sem que isso gere direito a indenização.',
+        'As denúncias são avaliadas por administradores designados pela Plataforma. Quando um projeto seu é removido por violar estes Termos, você é avisado na própria Plataforma e, se o serviço de e-mail estiver disponível, também por e-mail. Quando a conta é encerrada, o aviso vai por e-mail.',
         'Conteúdo será removido mediante ordem judicial específica e, no caso de imagens de nudez ou atos sexuais divulgados sem consentimento, mediante notificação da pessoa retratada ou de seu representante legal (art. 21 do Marco Civil da Internet).',
         'A remoção de conteúdo pela Plataforma não transfere a ela a responsabilidade pelo que foi publicado.',
       ],
@@ -120,7 +122,7 @@ const TERMOS = {
     {
       titulo: '13. Encerramento da conta',
       paragrafos: [
-        `Você pode excluir sua conta a qualquer momento pela página da conta, o que é definitivo e não pode ser desfeito. A cópia descrita na seção 5 é mantida por até ${RETENCAO_CONTA_EXCLUIDA_MESES} meses e então apagada. As obrigações e isenções destes Termos referentes ao período em que a conta esteve ativa continuam válidas após o encerramento.`,
+        `Você pode excluir sua conta a qualquer momento pela página da conta, o que é definitivo e não pode ser desfeito. A Plataforma também pode encerrá-la por violação destes Termos, conforme a seção 10; nesse caso, e só nele, a conta pode ser restaurada dentro do prazo descrito na seção 5. A cópia descrita na seção 5 é mantida por até ${RETENCAO_CONTA_EXCLUIDA_MESES} meses e então apagada. As obrigações e isenções destes Termos referentes ao período em que a conta esteve ativa continuam válidas após o encerramento.`,
       ],
     },
     {

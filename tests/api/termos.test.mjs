@@ -27,7 +27,7 @@ test('GET /api/termos é público e traz versão e texto', async () => {
 
   assert.equal(resposta.status, 200)
   assert.equal(resposta.body.versao, TERMOS_VERSAO)
-  assert.equal(resposta.body.versao, '1.1', 'a versão com o prazo de guarda da conta excluída')
+  assert.equal(resposta.body.versao, '1.2', 'a versão que permite restaurar conta encerrada pela moderação')
   assert.equal(resposta.body.retencaoContaExcluidaMeses, 6)
   assert.ok(resposta.body.secoes.length > 0)
   for (const secao of resposta.body.secoes) {

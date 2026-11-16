@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { apiRequest } from '../api.js'
 import AccountMenu from '../components/AccountMenu.jsx'
+import Avisos from '../components/Avisos.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import TrashIcon from '../components/TrashIcon.jsx'
 import { LikeCount } from '../components/InteractionIcons.jsx'
@@ -194,6 +195,8 @@ export default function EditorPage() {
           <Link to="/conta">Conta</Link>
         </AccountMenu>
       </header>
+
+      <Avisos />
 
       {isLoading && <p className="home-status">Carregando projetos...</p>}
       {error && <p className="home-status home-status--error">{error}</p>}

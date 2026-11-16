@@ -94,10 +94,13 @@ async function apagarBanco(banco) {
   }
 }
 
-function ambienteDoFilho(banco, porta) {
+function ambienteDoFilho(banco, porta, donoEmail = '') {
   return {
     ...process.env,
     NODE_ENV: 'test',
+    // Vazio (não removido), como o Cloudinary: o dono do `.env` de quem roda
+    // os testes não pode virar administrador no banco de teste.
+    ADMIN_DONO_EMAIL: donoEmail,
     PORT: String(porta),
     DB_NAME: banco,
     DATABASE_URL: urlDoBanco(banco),
@@ -136,8 +139,11 @@ async function esperarServidor(base, processo, log) {
  * `sufixo` dá a cada arquivo de teste o seu próprio banco: o `node --test`
  * roda os arquivos em paralelo, e sem isso um apagaria o banco do outro no
  * meio da execução.
+ *
+ * `donoEmail` vira o `ADMIN_DONO_EMAIL` do servidor de teste: a conta com
+ * esse e-mail é a dona da plataforma (administradora que não perde o acesso).
  */
-export async function iniciarAmbiente(sufixo = '') {
+export async function iniciarAmbiente(sufixo = '', { donoEmail = '' } = {}) {
   const banco = sufixo ? `${PREFIXO_BANCO}_${sufixo}` : PREFIXO_BANCO
   await recriarBanco(banco)
 
@@ -157,7 +163,7 @@ export async function iniciarAmbiente(sufixo = '') {
 
   const processo = spawn(process.execPath, ['--require', STUB_EMAIL, '--require', ENCERRAR, 'server.js'], {
     cwd: RAIZ,
-    env: ambienteDoFilho(banco, porta),
+    env: ambienteDoFilho(banco, porta, donoEmail),
     stdio: ['pipe', 'pipe', 'pipe'],
   })
   processo.stdout.on('data', (parte) => log.push(String(parte)))
