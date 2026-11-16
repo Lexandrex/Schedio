@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { apiRequest } from '../api.js'
 import AccountMenu from '../components/AccountMenu.jsx'
+import { useAuth } from '../context/AuthContext.jsx'
 import TrashIcon from '../components/TrashIcon.jsx'
 import { LikeCount } from '../components/InteractionIcons.jsx'
 import { MAX_TAGS_LENGTH, TAGS_HINT, formatTags, parseTags } from '../tags.js'
@@ -29,11 +30,20 @@ export default function EditorPage() {
   const [isDeleting, setIsDeleting] = useState(false)
   const [isPublishing, setIsPublishing] = useState(false)
 
+  // Projetos de outras pessoas em que entrei por um link de colaboração.
+  const { user } = useAuth()
+  const [compartilhados, setCompartilhados] = useState([])
+  const [saindoId, setSaindoId] = useState(null)
+
   useEffect(() => {
     apiRequest('/api/projects/mine')
       .then((data) => setProjects(data.projects))
       .catch((requestError) => setError(requestError.message))
       .finally(() => setIsLoading(false))
+    // Falhar aqui não deve esconder os projetos próprios: a seção só não aparece.
+    apiRequest('/api/projects/compartilhados')
+      .then((data) => setCompartilhados(data.projects || []))
+      .catch(() => setCompartilhados([]))
   }, [])
 
   const visibleProjects = useMemo(() => {
@@ -41,6 +51,29 @@ export default function EditorPage() {
     if (!term) return projects
     return projects.filter((project) => project.titulo.toLowerCase().includes(term))
   }, [projects, search])
+
+  const visibleShared = useMemo(() => {
+    const term = search.trim().toLowerCase()
+    if (!term) return compartilhados
+    return compartilhados.filter((project) => project.titulo.toLowerCase().includes(term))
+  }, [compartilhados, search])
+
+  /** Sair de um projeto compartilhado: o primeiro clique pede confirmação. */
+  async function sairDoProjeto(project) {
+    if (saindoId !== project.id) {
+      setSaindoId(project.id)
+      return
+    }
+    setError('')
+    try {
+      await apiRequest(`/api/projects/${project.id}/colaboradores/${user.id}`, { method: 'DELETE' })
+      setCompartilhados((current) => current.filter((item) => item.id !== project.id))
+    } catch (requestError) {
+      setError(requestError.message)
+    } finally {
+      setSaindoId(null)
+    }
+  }
 
   const selectedProject = projects.find((project) => project.id === selectedId) || null
 
@@ -164,7 +197,7 @@ export default function EditorPage() {
 
       {isLoading && <p className="home-status">Carregando projetos...</p>}
       {error && <p className="home-status home-status--error">{error}</p>}
-      {!isLoading && !error && visibleProjects.length === 0 && (
+      {!isLoading && !error && visibleProjects.length === 0 && (projects.length === 0 || visibleShared.length === 0) && (
         <p className="home-status">
           {projects.length === 0
             ? 'Você ainda não criou nenhum projeto.'
@@ -244,6 +277,44 @@ export default function EditorPage() {
           )
         })}
       </div>
+
+      {visibleShared.length > 0 && (
+        <section className="editor-shared" aria-labelledby="editor-shared-title">
+          <h2 className="home-section-title" id="editor-shared-title">
+            Compartilhados comigo
+          </h2>
+          <div className="editor-grid">
+            {visibleShared.map((project) => (
+              <article className="editor-card" key={project.id}>
+                <h2 className="editor-card-title">{project.titulo}</h2>
+                <Link
+                  className="editor-card-cover"
+                  to={`/editor/${project.id}`}
+                  aria-label={`Abrir ${project.titulo}`}
+                  style={project.capa ? { backgroundImage: `url(${project.capa})` } : undefined}
+                />
+                <p className="editor-card-author">de {project.autor_nome || project.autor_email}</p>
+                <div className="editor-card-footer">
+                  <span className="status-chip">Colaborador</span>
+                  <div className="editor-card-actions">
+                    <button
+                      className="editor-card-open"
+                      type="button"
+                      onClick={() => sairDoProjeto(project)}
+                      title="Deixar de colaborar neste projeto"
+                    >
+                      {saindoId === project.id ? 'Confirmar saída' : 'Sair'}
+                    </button>
+                    <Link className="editor-card-open" to={`/editor/${project.id}`}>
+                      Abrir
+                    </Link>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
 
       <div className="trash-area">
         {confirmDelete && selectedProject && (

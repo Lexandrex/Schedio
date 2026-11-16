@@ -426,15 +426,22 @@ function ProjectSection({ capa, isUploading, onChangeCapa }) {
           style={capa ? { backgroundImage: `url(${capa})` } : undefined}
           aria-label={capa ? 'Capa atual do projeto' : 'Projeto sem capa'}
         />
-        <button
-          className="text-button prop-reset"
-          type="button"
-          onClick={onChangeCapa}
-          disabled={isUploading}
-        >
-          {isUploading ? 'Enviando...' : capa ? 'Trocar capa' : 'Enviar capa'}
-        </button>
-        <p className="prop-hint">A capa aparece na tela inicial e na apresentação para o leitor.</p>
+        {/* Sem `onChangeCapa` (colaborador) a capa só se vê: ela é do dono. */}
+        {onChangeCapa ? (
+          <button
+            className="text-button prop-reset"
+            type="button"
+            onClick={onChangeCapa}
+            disabled={isUploading}
+          >
+            {isUploading ? 'Enviando...' : capa ? 'Trocar capa' : 'Enviar capa'}
+          </button>
+        ) : null}
+        <p className="prop-hint">
+          {onChangeCapa
+            ? 'A capa aparece na tela inicial e na apresentação para o leitor.'
+            : 'Só o dono do projeto troca a capa.'}
+        </p>
       </section>
 
       <p className="properties-empty">

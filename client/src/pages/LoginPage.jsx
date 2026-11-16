@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate, useOutletContext } from 'react-router-dom'
 import { authRequest } from '../api.js'
 import { useAuth } from '../context/AuthContext.jsx'
+import { destinoDepoisDoLogin } from '../routes/destino.js'
 
 export default function LoginPage() {
   const { setFeedback } = useOutletContext()
@@ -14,9 +15,12 @@ export default function LoginPage() {
     event.preventDefault()
 
     try {
+      // Lido antes do login: assim que a sessão existe, o RequireAuth do
+      // destino o apaga.
+      const destino = destinoDepoisDoLogin()
       const data = await authRequest('login', { email, password })
       await login(data.token)
-      navigate('/')
+      navigate(destino)
     } catch (error) {
       setFeedback({ message: error.message, type: 'error' })
     }

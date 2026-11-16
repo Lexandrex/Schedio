@@ -47,6 +47,9 @@ export default function CanvasStage({
   onPointerCoords,
   onDropIcon,
   onTextSelection,
+  // Visualização por link (RN-19): só pan, zoom e pinça. Nada se seleciona,
+  // move, cria ou entra em edição.
+  readOnly = false,
 }) {
   const svgRef = useRef(null)
   const dragRef = useRef(null)
@@ -152,6 +155,12 @@ export default function CanvasStage({
     // Clicar no mapa encerra a edição. Não dependemos só do `blur`: se o foco
     // sair por outro caminho (troca de janela), o editor ficaria aberto.
     if (editingId) setEditingId(null)
+
+    if (readOnly) {
+      lastHitRef.current = null
+      dragRef.current = { mode: 'pan', start: { x: event.clientX, y: event.clientY }, origin: { ...view } }
+      return
+    }
 
     const point = toCanvasPoint(event)
     const targetId = event.target.getAttribute?.('data-el')
@@ -367,6 +376,7 @@ export default function CanvasStage({
 
   /** Duplo clique num texto abre a edição direto na caixa. */
   function handleDoubleClick() {
+    if (readOnly) return
     const targetId = lastHitRef.current
     if (!targetId) return
     const alvo = elements.find((item) => item.id === targetId)
@@ -377,6 +387,7 @@ export default function CanvasStage({
   }
 
   function handleDragOver(event) {
+    if (readOnly) return
     if (!event.dataTransfer.types.includes('application/x-schedio-icon')) return
     event.preventDefault()
     event.dataTransfer.dropEffect = 'copy'
@@ -440,7 +451,7 @@ export default function CanvasStage({
   const pendingElement = pendingFrom ? byId.get(pendingFrom) : null
   const pendingBox = pendingElement && boxOf(pendingElement)
   const selectedBox = selected && boxOf(selected)
-  const cursor = tool === TOOLS.select ? 'default' : 'crosshair'
+  const cursor = readOnly ? 'grab' : tool === TOOLS.select ? 'default' : 'crosshair'
   // A grade acompanha o zoom: células de 20 unidades do mapa, blocos de 100.
   const cell = 20 * view.zoom
   const block = 100 * view.zoom

@@ -105,12 +105,27 @@ async function substituirImagem(arquivo, pasta, anterior, gravar) {
   return gravado;
 }
 
-/** Só o dono mexe nas imagens do projeto. */
+/** Só o dono troca a capa do projeto. */
 async function projetoDoUsuario(projetoId, userId) {
   const result = await query(
     'SELECT id, capa, capa_public_id FROM projetos WHERE id = $1 AND usuario_id = $2',
     [projetoId, userId],
   );
+  if (!result.rows[0]) throw new ErroHttp(404, PROJETO_NAO_ENCONTRADO);
+  return result.rows[0];
+}
+
+/**
+ * Condição SQL "quem pede pode editar o canvas": o dono ou um colaborador
+ * (RN-18). `p` é o alias de `projetos` e `$n` o parâmetro com o id do usuário.
+ */
+const podeEditar = (n) =>
+  `(p.usuario_id = $${n} OR EXISTS (
+     SELECT 1 FROM projeto_colaboradores c WHERE c.projeto_id = p.id AND c.usuario_id = $${n}))`;
+
+/** Canvas e imagens dele: dono ou colaborador. Quem não pode recebe 404, como nas rotas do dono. */
+async function projetoEditavel(projetoId, userId) {
+  const result = await query(`SELECT p.id FROM projetos p WHERE p.id = $1 AND ${podeEditar(2)}`, [projetoId, userId]);
   if (!result.rows[0]) throw new ErroHttp(404, PROJETO_NAO_ENCONTRADO);
   return result.rows[0];
 }
@@ -506,13 +521,52 @@ app.post('/api/projects', requireAuth, rota(async (request, response) => {
   return response.status(201).json({ project: result.rows[0] });
 }));
 
+/** Projetos em que quem pede entrou como colaborador, com o dono de cada um. */
+app.get('/api/projects/compartilhados', requireAuth, rota(async (request, response) => {
+  const result = await query(
+    `SELECT p.id, p.titulo, p.descricao, p.categoria, p.capa, p.status, p.likes, p.criado,
+            u.id AS autor_id, u.nome AS autor_nome, u.email AS autor_email
+     FROM projeto_colaboradores c
+     JOIN projetos p ON p.id = c.projeto_id
+     JOIN users u ON u.id = p.usuario_id
+     WHERE c.usuario_id = $1
+     ORDER BY c.adicionado_em DESC`,
+    [request.userId],
+  );
+  return response.json({ projects: result.rows });
+}));
+
+/**
+ * O projeto para o editor: dono ou colaborador. `papel` diz qual dos dois,
+ * porque o colaborador edita o canvas mas não publica, não troca a capa nem
+ * compartilha. `versao` é o que ele devolve ao gravar (ver PUT .../conteudo).
+ */
 app.get('/api/projects/:id', requireAuth, rota(async (request, response) => {
   const result = await query(
-    `SELECT ${CAMPOS_PROJETO}, conteudo FROM projetos WHERE id = $1 AND usuario_id = $2`,
+    `SELECT p.id, p.titulo, p.descricao, p.categoria, p.capa, p.status, p.likes, p.criado,
+            p.conteudo, p.conteudo_versao AS versao,
+            CASE WHEN p.usuario_id = $2 THEN 'dono' ELSE 'colaborador' END AS papel,
+            u.nome AS autor_nome, u.email AS autor_email
+     FROM projetos p
+     JOIN users u ON u.id = p.usuario_id
+     WHERE p.id = $1 AND ${podeEditar(2)}`,
     [request.params.id, request.userId],
   );
   if (!result.rows[0]) return response.status(404).json({ message: PROJETO_NAO_ENCONTRADO });
   return response.json({ project: result.rows[0] });
+}, PROJETO_NAO_ENCONTRADO));
+
+/**
+ * Só a versão do canvas: o editor consulta a cada poucos segundos para trazer o
+ * que outra pessoa salvou sem baixar o documento inteiro à toa.
+ */
+app.get('/api/projects/:id/versao', requireAuth, rota(async (request, response) => {
+  const result = await query(
+    `SELECT p.conteudo_versao AS versao FROM projetos p WHERE p.id = $1 AND ${podeEditar(2)}`,
+    [request.params.id, request.userId],
+  );
+  if (!result.rows[0]) return response.status(404).json({ message: PROJETO_NAO_ENCONTRADO });
+  return response.json(result.rows[0]);
 }, PROJETO_NAO_ENCONTRADO));
 
 /**
@@ -731,24 +785,191 @@ app.patch('/api/projects/:id/status', requireAuth, rota(async (request, response
   return response.json({ project: result.rows[0] });
 }, PROJETO_NAO_ENCONTRADO));
 
+/**
+ * Grava o canvas (dono ou colaborador). Com `versao`, só grava se ninguém
+ * salvou desde que o editor abriu aquela versão — senão 409, e o editor
+ * pergunta se recarrega ou sobrescreve. Sem `versao` grava de qualquer jeito:
+ * é o "sobrescrever" e também o que clientes antigos mandam.
+ */
 app.put('/api/projects/:id/conteudo', requireAuth, rota(async (request, response) => {
-  const { conteudo } = request.body;
+  const { conteudo, versao } = request.body;
   if (!conteudo || typeof conteudo !== 'object' || !Array.isArray(conteudo.elements)) {
     return response.status(400).json({ message: 'Conteúdo do projeto inválido.' });
   }
+  if (versao !== undefined && versao !== null && !Number.isInteger(versao)) {
+    return response.status(400).json({ message: 'Versão do conteúdo inválida.' });
+  }
 
   const result = await query(
-    'UPDATE projetos SET conteudo = $1 WHERE id = $2 AND usuario_id = $3',
-    [conteudo, request.params.id, request.userId],
+    `UPDATE projetos p SET conteudo = $1, conteudo_versao = p.conteudo_versao + 1
+     WHERE p.id = $2 AND ${podeEditar(3)} AND ($4::int IS NULL OR p.conteudo_versao = $4::int)
+     RETURNING p.conteudo_versao AS versao`,
+    [conteudo, request.params.id, request.userId, versao ?? null],
   );
-  if (!result.rowCount) {
-    return response.status(404).json({ message: PROJETO_NAO_ENCONTRADO });
-  }
-  return response.status(204).send();
+  if (result.rows[0]) return response.json(result.rows[0]);
+
+  // Nada gravado: ou não há acesso (404), ou a versão ficou para trás (409).
+  await projetoEditavel(request.params.id, request.userId);
+  return response.status(409).json({
+    message: 'Outra pessoa salvou este projeto enquanto você editava.',
+  });
 }, PROJETO_NAO_ENCONTRADO));
 
+/*
+ * Compartilhamento (RF-18, RN-17 a RN-20).
+ *
+ * - Link de visualização: quem o abre, logado, vê o canvas como está e pode
+ *   simular, mas não grava nada (RN-19). Vale só enquanto o link vale.
+ * - Link de colaboração: quem o aceita entra em `projeto_colaboradores` e passa
+ *   a editar o canvas (RN-18). O link vence; o acesso fica até o dono remover.
+ *
+ * RN-17: o link não publica nada. Projeto privado continua fora da vitrine,
+ * do perfil e da leitura pública; o link só alcança aquele projeto, e só para
+ * quem está com ele em mãos.
+ */
+const TIPOS_DE_LINK = ['visualizacao', 'colaboracao'];
+/** Prazos que o dono pode escolher, em horas (RN-20: curtos). */
+const VALIDADES_DE_LINK = [1, 24, 72];
+const LINK_INVALIDO = 'Link inválido ou expirado.';
+
+const hashDoToken = (token) => crypto.createHash('sha256').update(String(token)).digest('hex');
+
+/** O projeto, se quem pede for o dono — só ele gerencia os links. */
+async function exigirDono(projetoId, userId) {
+  const result = await query('SELECT id FROM projetos WHERE id = $1 AND usuario_id = $2', [projetoId, userId]);
+  if (!result.rows[0]) throw new ErroHttp(404, PROJETO_NAO_ENCONTRADO);
+}
+
+app.get('/api/projects/:id/compartilhamento', requireAuth, rota(async (request, response) => {
+  await exigirDono(request.params.id, request.userId);
+  const links = await query(
+    `SELECT id, tipo, criado_em, expira_em FROM projeto_links
+     WHERE projeto_id = $1 AND expira_em > NOW()
+     ORDER BY criado_em DESC`,
+    [request.params.id],
+  );
+  const colaboradores = await query(
+    `SELECT u.id, u.nome, u.email, u.foto, c.adicionado_em
+     FROM projeto_colaboradores c JOIN users u ON u.id = c.usuario_id
+     WHERE c.projeto_id = $1
+     ORDER BY c.adicionado_em`,
+    [request.params.id],
+  );
+  return response.json({ links: links.rows, colaboradores: colaboradores.rows });
+}, PROJETO_NAO_ENCONTRADO));
+
+/** Gera um link. O segredo volta só nesta resposta; o banco guarda o hash. */
+app.post('/api/projects/:id/links', requireAuth, rota(async (request, response) => {
+  const { tipo } = request.body;
+  const horas = request.body.horas ?? 24;
+  if (!TIPOS_DE_LINK.includes(tipo)) {
+    return response.status(400).json({ message: 'Tipo de link inválido.' });
+  }
+  if (!VALIDADES_DE_LINK.includes(horas)) {
+    return response.status(400).json({ message: 'Escolha uma validade de 1 hora, 24 horas ou 3 dias.' });
+  }
+  await exigirDono(request.params.id, request.userId);
+
+  const token = crypto.randomBytes(24).toString('base64url');
+  const result = await query(
+    `INSERT INTO projeto_links (projeto_id, tipo, token_hash, expira_em)
+     VALUES ($1, $2, $3, NOW() + make_interval(hours => $4))
+     RETURNING id, tipo, criado_em, expira_em`,
+    [request.params.id, tipo, hashDoToken(token), horas],
+  );
+  return response.status(201).json({ link: { ...result.rows[0], token } });
+}, PROJETO_NAO_ENCONTRADO));
+
+/** Revogar: o link deixa de funcionar na hora. Colaboradores que já entraram ficam. */
+app.delete('/api/projects/:id/links/:linkId', requireAuth, rota(async (request, response) => {
+  await exigirDono(request.params.id, request.userId);
+  const result = await query(
+    'DELETE FROM projeto_links WHERE id = $1 AND projeto_id = $2',
+    [request.params.linkId, request.params.id],
+  );
+  if (!result.rowCount) return response.status(404).json({ message: 'Link não encontrado.' });
+  return response.status(204).send();
+}, 'Link não encontrado.'));
+
+/**
+ * Tira um colaborador: o dono tira qualquer um, e o próprio colaborador pode
+ * sair. Para os outros a resposta é 404, sem confirmar quem colabora.
+ */
+app.delete('/api/projects/:id/colaboradores/:userId', requireAuth, rota(async (request, response) => {
+  const result = await query(
+    `DELETE FROM projeto_colaboradores c
+     USING projetos p
+     WHERE p.id = c.projeto_id AND c.projeto_id = $1 AND c.usuario_id = $2
+       AND (p.usuario_id = $3 OR c.usuario_id = $3)`,
+    [request.params.id, request.params.userId, request.userId],
+  );
+  if (!result.rowCount) return response.status(404).json({ message: 'Colaborador não encontrado.' });
+  return response.status(204).send();
+}, 'Colaborador não encontrado.'));
+
+/** Link válido (existe e não venceu), com o projeto e o dono dele. */
+async function linkValido(token) {
+  const result = await query(
+    `SELECT l.tipo, l.expira_em, p.id AS projeto_id, p.titulo, p.usuario_id AS dono_id, u.nome AS autor_nome
+     FROM projeto_links l
+     JOIN projetos p ON p.id = l.projeto_id
+     JOIN users u ON u.id = p.usuario_id
+     WHERE l.token_hash = $1 AND l.expira_em > NOW()`,
+    [hashDoToken(token)],
+  );
+  if (!result.rows[0]) throw new ErroHttp(404, LINK_INVALIDO);
+  return result.rows[0];
+}
+
+/**
+ * Abre um link. O de visualização já traz o canvas (só leitura); o de
+ * colaboração traz o convite, que a pessoa aceita no POST abaixo. O e-mail do
+ * dono não vai junto: quem tem o link não ganha mais do que o projeto.
+ */
+app.get('/api/convites/:token', requireAuth, rota(async (request, response) => {
+  const link = await linkValido(request.params.token);
+  const convite = {
+    tipo: link.tipo,
+    expira_em: link.expira_em,
+    projeto: { id: link.projeto_id, titulo: link.titulo, autor_nome: link.autor_nome },
+  };
+
+  if (link.tipo === 'colaboracao') {
+    const membro = await query(
+      `SELECT 1 FROM projetos p WHERE p.id = $1 AND ${podeEditar(2)}`,
+      [link.projeto_id, request.userId],
+    );
+    convite.jaPodeEditar = Boolean(membro.rows[0]);
+    return response.json({ convite });
+  }
+
+  const conteudo = await query(
+    'SELECT conteudo, conteudo_versao AS versao FROM projetos WHERE id = $1',
+    [link.projeto_id],
+  );
+  Object.assign(convite.projeto, conteudo.rows[0]);
+  return response.json({ convite });
+}));
+
+app.post('/api/convites/:token/aceitar', requireAuth, rota(async (request, response) => {
+  const link = await linkValido(request.params.token);
+  if (link.tipo !== 'colaboracao') {
+    return response.status(400).json({ message: 'Este link é só de visualização.' });
+  }
+  if (link.dono_id === request.userId) {
+    return response.status(400).json({ message: 'Você já é o dono deste projeto.' });
+  }
+  // Aceitar duas vezes não duplica nem falha: a pessoa só vai para o editor.
+  await query(
+    `INSERT INTO projeto_colaboradores (projeto_id, usuario_id) VALUES ($1, $2)
+     ON CONFLICT DO NOTHING`,
+    [link.projeto_id, request.userId],
+  );
+  return response.json({ projeto: { id: link.projeto_id } });
+}));
+
 app.get('/api/projects/:id/imagens', requireAuth, rota(async (request, response) => {
-  await projetoDoUsuario(request.params.id, request.userId);
+  await projetoEditavel(request.params.id, request.userId);
   const result = await query(
     'SELECT id, url, public_id FROM imagens WHERE projeto_id = $1 ORDER BY id',
     [request.params.id],
@@ -757,7 +978,7 @@ app.get('/api/projects/:id/imagens', requireAuth, rota(async (request, response)
 }, PROJETO_NAO_ENCONTRADO));
 
 app.post('/api/projects/:id/imagens', comImagem, rota(async (request, response) => {
-  await projetoDoUsuario(request.params.id, request.userId);
+  await projetoEditavel(request.params.id, request.userId);
   const enviada = await storage.uploadBuffer(request.file.buffer);
   const result = await query(
     'INSERT INTO imagens (projeto_id, url, public_id) VALUES ($1, $2, $3) RETURNING id, url, public_id',
@@ -940,6 +1161,10 @@ function expurgar() {
   expurgarContasVencidas({ query, storage })
     .then(({ contas }) => contas && console.log(`Expurgo: ${contas} conta(s) excluída(s) vencida(s) apagada(s).`))
     .catch((error) => console.error('Expurgo de contas excluídas falhou:', error.message));
+  // Link vencido já não abre nada (as rotas filtram por `expira_em`); aqui só
+  // some da tabela.
+  query('DELETE FROM projeto_links WHERE expira_em <= NOW()')
+    .catch((error) => console.error('Limpeza de links vencidos falhou:', error.message));
 }
 
 expurgar();

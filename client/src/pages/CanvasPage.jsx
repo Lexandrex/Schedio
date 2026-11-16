@@ -7,6 +7,7 @@ import PropertiesPanel from '../canvas/PropertiesPanel.jsx'
 import PrototypePlayer from '../canvas/PrototypePlayer.jsx'
 import IconLibrary from '../canvas/IconLibrary.jsx'
 import LayersPanel from '../canvas/LayersPanel.jsx'
+import ShareDialog from '../canvas/ShareDialog.jsx'
 import { ICON_DEFAULT_SIZE } from '../canvas/iconLibrary.js'
 import {
   TOOLS,
@@ -25,6 +26,8 @@ import { createStore, useStore } from '../canvas/store.js'
 import { DEFAULT_VIEW, clampZoom } from '../canvas/view.js'
 
 const AUTOSAVE_MS = 10000
+/** De quanto em quanto tempo o mapa procura o que outra pessoa salvou. */
+const SINCRONIA_MS = 10000
 
 /** Deslocamento de um passo pelas setas do teclado, para ajuste fino. */
 const NUDGE = {
@@ -73,16 +76,33 @@ function Coordenadas({ store }) {
   )
 }
 
-export default function CanvasPage() {
-  const { id } = useParams()
+/**
+ * O editor do projeto. Abre de três jeitos:
+ * - dono: tudo;
+ * - colaborador (`project.papel === 'colaborador'`): edita o canvas, mas não
+ *   publica, não troca a capa nem compartilha (RN-18);
+ * - `visualizacao` ({ token, convite }), vindo de um link de visualização:
+ *   só vê e simula (RN-19). O conteúdo chega pelo convite, não pela rota do
+ *   editor, e nada é gravado.
+ *
+ * Nos três, o mapa procura de tempos em tempos o que outra pessoa salvou e,
+ * se não há alteração local pendente, troca pelo novo.
+ */
+export default function CanvasPage({ visualizacao = null }) {
+  const params = useParams()
+  const somenteLeitura = Boolean(visualizacao)
+  const id = somenteLeitura ? visualizacao.convite.projeto.id : params.id
 
-  const [project, setProject] = useState(null)
-  const [elements, setElements] = useState([])
-  const [isLoading, setIsLoading] = useState(true)
+  // Na visualização o projeto já chegou com o convite: nasce carregado.
+  const inicial = visualizacao?.convite.projeto
+  const [project, setProject] = useState(inicial || null)
+  const [elements, setElements] = useState(inicial?.conteudo?.elements || [])
+  const [isLoading, setIsLoading] = useState(!inicial)
   const [error, setError] = useState('')
 
-  const [connections, setConnections] = useState([])
-  const [startScreenId, setStartScreenId] = useState(null)
+  // Documentos da versão 1 não têm ligações; o editor segue funcionando com eles.
+  const [connections, setConnections] = useState(inicial?.conteudo?.connections || [])
+  const [startScreenId, setStartScreenId] = useState(inicial?.conteudo?.startScreen || null)
 
   const [tool, setTool] = useState(TOOLS.select)
   const [selectedId, setSelectedId] = useState(null)
@@ -93,6 +113,10 @@ export default function CanvasPage() {
   // página: muda a cada movimento do cursor, e só o painel precisa saber.
   const [textSelectionStore] = useState(() => createStore(null))
   const [isPlaying, setIsPlaying] = useState(false)
+  const [isSharing, setIsSharing] = useState(false)
+  // Outra pessoa salvou desde que abrimos a versão em mãos: o salvamento
+  // parou e o usuário decide entre recarregar e sobrescrever.
+  const [conflito, setConflito] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const imagemInputRef = useRef(null)
   const capaInputRef = useRef(null)
@@ -114,32 +138,45 @@ export default function CanvasPage() {
   const connectionsRef = useRef(connections)
   const startScreenRef = useRef(startScreenId)
   const dirtyRef = useRef(false)
+  const conflitoRef = useRef(false)
+  const savingRef = useRef(false)
+  // Versão do canvas em mãos: vai junto ao gravar, e o servidor recusa (409)
+  // se outra pessoa salvou depois dela.
+  const versaoRef = useRef(inicial?.versao ?? 0)
 
   useEffect(() => {
     elementsRef.current = elements
     connectionsRef.current = connections
     startScreenRef.current = startScreenId
     dirtyRef.current = isDirty
+    conflitoRef.current = conflito
   })
 
+  const aplicarProjeto = useCallback((dados) => {
+    const conteudo = dados.conteudo || {}
+    versaoRef.current = dados.versao ?? 0
+    setProject(dados)
+    setElements(conteudo.elements || [])
+    // Documentos da versão 1 não têm ligações; o editor segue funcionando com eles.
+    setConnections(conteudo.connections || [])
+    setStartScreenId(conteudo.startScreen || null)
+  }, [])
+
   useEffect(() => {
+    if (visualizacao) return
     apiRequest(`/api/projects/${id}`)
-      .then((data) => {
-        const conteudo = data.project.conteudo || {}
-        setProject(data.project)
-        setElements(conteudo.elements || [])
-        // Documentos da versão 1 não têm ligações; o editor segue funcionando com eles.
-        setConnections(conteudo.connections || [])
-        setStartScreenId(conteudo.startScreen || null)
-      })
+      .then((data) => aplicarProjeto(data.project))
       .catch((requestError) => setError(requestError.message))
       .finally(() => setIsLoading(false))
-  }, [id])
+  }, [id, visualizacao, aplicarProjeto])
 
-  const save = useCallback(async () => {
+  /** Com `forcar`, grava sem conferir a versão: é o "sobrescrever" do conflito. */
+  const save = useCallback(async ({ forcar = false } = {}) => {
+    if (somenteLeitura) return false
     setIsSaving(true)
+    savingRef.current = true
     try {
-      await apiRequest(`/api/projects/${id}/conteudo`, {
+      const data = await apiRequest(`/api/projects/${id}/conteudo`, {
         method: 'PUT',
         json: {
           conteudo: {
@@ -148,19 +185,71 @@ export default function CanvasPage() {
             connections: connectionsRef.current,
             startScreen: startScreenRef.current,
           },
+          ...(forcar ? {} : { versao: versaoRef.current }),
         },
       })
+      if (data?.versao !== undefined) versaoRef.current = data.versao
       setIsDirty(false)
       setSavedAt(new Date())
       setError('')
+      setConflito(false)
       return true
     } catch (requestError) {
-      setError(requestError.message)
+      if (requestError.status === 409) {
+        setConflito(true)
+        setError('')
+      } else {
+        setError(requestError.message)
+      }
       return false
     } finally {
       setIsSaving(false)
+      savingRef.current = false
     }
-  }, [id])
+  }, [id, somenteLeitura])
+
+  /** Descarta o que não foi salvo e abre a versão que está no servidor. */
+  const recarregar = useCallback(async () => {
+    try {
+      const data = await apiRequest(`/api/projects/${id}`)
+      aplicarProjeto(data.project)
+      setIsDirty(false)
+      setConflito(false)
+      setError('')
+    } catch (requestError) {
+      setError(requestError.message)
+    }
+  }, [id, aplicarProjeto])
+
+  // Traz o que outra pessoa salvou. Com alteração local pendente não troca
+  // nada: o próximo salvamento é que detecta o conflito e pergunta.
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      if (dirtyRef.current || savingRef.current || conflitoRef.current) return
+      try {
+        if (visualizacao) {
+          const { convite } = await apiRequest(`/api/convites/${visualizacao.token}`)
+          if (convite.projeto.versao !== versaoRef.current) aplicarProjeto(convite.projeto)
+          return
+        }
+        const { versao } = await apiRequest(`/api/projects/${id}/versao`)
+        if (versao === versaoRef.current) return
+        const { project: atual } = await apiRequest(`/api/projects/${id}`)
+        if (!dirtyRef.current && !savingRef.current) aplicarProjeto(atual)
+      } catch (requestError) {
+        if (requestError.status !== 404) return
+        // Link vencido ou revogado, ou colaborador removido: o acesso acabou.
+        if (visualizacao) {
+          setProject(null)
+          setIsPlaying(false)
+          setError('Este link expirou ou foi revogado.')
+        } else {
+          setError('Você não tem mais acesso a este projeto.')
+        }
+      }
+    }, SINCRONIA_MS)
+    return () => clearInterval(interval)
+  }, [id, visualizacao, aplicarProjeto])
 
   const toggleStatus = useCallback(async () => {
     const status = project?.status === 'publicado' ? 'privado' : 'publicado'
@@ -183,7 +272,7 @@ export default function CanvasPage() {
   // Salvamento automático a cada 10 segundos, apenas quando há alterações pendentes.
   useEffect(() => {
     const interval = setInterval(() => {
-      if (dirtyRef.current) save()
+      if (dirtyRef.current && !conflitoRef.current) save()
     }, AUTOSAVE_MS)
     return () => clearInterval(interval)
   }, [save])
@@ -445,10 +534,15 @@ export default function CanvasPage() {
         return
       }
 
+      if (somenteLeitura) return
+
       // O editor de texto do mapa é um contenteditable, não um campo: sem
       // essa guarda, Backspace nele apagaria o elemento inteiro.
       const tag = event.target.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || event.target.isContentEditable) return
+      // Com um diálogo aberto (compartilhar), Backspace num botão dele não
+      // pode apagar o elemento selecionado atrás.
+      if (event.target.closest?.('[role="dialog"]')) return
 
       if (event.key === 'Escape') {
         setPendingFrom(null)
@@ -504,11 +598,15 @@ export default function CanvasPage() {
     duplicarElemento,
     moverElemento,
     save,
+    somenteLeitura,
   ])
 
   const selected = elements.find((element) => element.id === selectedId) || null
   const selectedConnection = connections.find((item) => item.id === selectedConnectionId) || null
   const temTelas = elements.some(isScreen)
+  const ehDono = !somenteLeitura && project?.papel !== 'colaborador'
+  const autor = project?.autor_nome || project?.autor_email
+  const voltar = somenteLeitura ? { to: '/', rotulo: '← Início' } : { to: '/editor', rotulo: '← Projetos' }
 
   function saveLabel() {
     if (isSaving) return 'Salvando...'
@@ -530,7 +628,7 @@ export default function CanvasPage() {
       <div className="canvas-page">
         <p className="home-status home-status--error">{error || 'Projeto não encontrado.'}</p>
         <p>
-          <Link to="/editor">← Voltar aos projetos</Link>
+          <Link to={voltar.to}>{somenteLeitura ? '← Voltar ao início' : '← Voltar aos projetos'}</Link>
         </p>
       </div>
     )
@@ -539,16 +637,24 @@ export default function CanvasPage() {
   return (
     <div className="canvas-page">
       <header className="canvas-header">
-        <Link className="back-button canvas-back" to="/editor">
-          ← Projetos
+        <Link className="back-button canvas-back" to={voltar.to}>
+          {voltar.rotulo}
         </Link>
 
         <div className="canvas-title">
           <h1>{project.titulo}</h1>
-          <span className={`status-chip status-chip--${project.status}`}>
-            {project.status === 'publicado' ? 'Público' : 'Privado'}
-          </span>
-          <span className={`canvas-save-state${isDirty ? ' dirty' : ''}`}>{saveLabel()}</span>
+          {somenteLeitura ? (
+            <span className="status-chip">Somente visualização</span>
+          ) : (
+            <span className={`status-chip status-chip--${project.status}`}>
+              {project.status === 'publicado' ? 'Público' : 'Privado'}
+            </span>
+          )}
+          {!somenteLeitura && !ehDono && <span className="status-chip">Colaborador</span>}
+          {!ehDono && autor && <span className="canvas-save-state">de {autor}</span>}
+          {!somenteLeitura && (
+            <span className={`canvas-save-state${isDirty ? ' dirty' : ''}`}>{saveLabel()}</span>
+          )}
         </div>
 
         <button
@@ -561,30 +667,62 @@ export default function CanvasPage() {
           ▶ Simular
         </button>
 
-        <button
-          className="text-button canvas-publish"
-          type="button"
-          onClick={toggleStatus}
-          disabled={isPublishing}
-          title={
-            project.status === 'publicado'
-              ? 'Deixar de exibir o projeto na tela inicial'
-              : 'Publicar para que outros usuários possam ver'
-          }
-        >
-          {isPublishing
-            ? 'Alterando...'
-            : project.status === 'publicado'
-              ? 'Tornar privado'
-              : 'Publicar'}
-        </button>
+        {ehDono && (
+          <>
+            <button
+              className="text-button canvas-publish"
+              type="button"
+              onClick={() => setIsSharing(true)}
+              title="Gerar links de visualização ou de colaboração"
+            >
+              Compartilhar
+            </button>
 
-        <button className="primary-button canvas-save" type="button" onClick={save} disabled={isSaving}>
-          Salvar
-        </button>
+            <button
+              className="text-button canvas-publish"
+              type="button"
+              onClick={toggleStatus}
+              disabled={isPublishing}
+              title={
+                project.status === 'publicado'
+                  ? 'Deixar de exibir o projeto na tela inicial'
+                  : 'Publicar para que outros usuários possam ver'
+              }
+            >
+              {isPublishing
+                ? 'Alterando...'
+                : project.status === 'publicado'
+                  ? 'Tornar privado'
+                  : 'Publicar'}
+            </button>
+          </>
+        )}
+
+        {!somenteLeitura && (
+          <button className="primary-button canvas-save" type="button" onClick={() => save()} disabled={isSaving}>
+            Salvar
+          </button>
+        )}
       </header>
 
       {error && <p className="home-status home-status--error canvas-error">{error}</p>}
+
+      {conflito && (
+        <div className="canvas-conflito" role="alert">
+          <p>
+            Outra pessoa salvou este projeto enquanto você editava. Recarregue para ver a versão dela (o que você
+            não salvou se perde) ou sobrescreva com a sua.
+          </p>
+          <div className="canvas-conflito-acoes">
+            <button className="text-button" type="button" onClick={recarregar}>
+              Recarregar
+            </button>
+            <button className="text-button" type="button" onClick={() => save({ forcar: true })} disabled={isSaving}>
+              Sobrescrever com a minha
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="canvas-body">
         <div className="canvas-viewport">
@@ -607,8 +745,11 @@ export default function CanvasPage() {
             onPointerCoords={coordsStore.set}
             onDropIcon={adicionarIcone}
             onTextSelection={textSelectionStore.set}
+            readOnly={somenteLeitura}
           />
 
+          {!somenteLeitura && (
+            <>
           <div className="canvas-rail">
             <IconLibrary
               onAddIcon={adicionarIcone}
@@ -656,6 +797,8 @@ export default function CanvasPage() {
                 : 'Clique no elemento de origem (um botão, forma ou tela).'}
             </p>
           )}
+            </>
+          )}
 
           <div className="canvas-status">
             <Coordenadas store={coordsStore} />
@@ -682,21 +825,23 @@ export default function CanvasPage() {
           </div>
         </div>
 
-        <PropertiesPanel
-          element={selected}
-          connection={selectedConnection}
-          elements={elements}
-          textSelectionStore={textSelectionStore}
-          isStartScreen={selected?.id === startScreenId}
-          capa={project.capa}
-          isUploading={isUploading}
-          onChangeCapa={() => capaInputRef.current?.click()}
-          onUpdate={updateElement}
-          onDelete={deleteElement}
-          onUpdateConnection={updateConnection}
-          onDeleteConnection={deleteConnection}
-          onSetStartScreen={setStartScreen}
-        />
+        {!somenteLeitura && (
+          <PropertiesPanel
+            element={selected}
+            connection={selectedConnection}
+            elements={elements}
+            textSelectionStore={textSelectionStore}
+            isStartScreen={selected?.id === startScreenId}
+            capa={project.capa}
+            isUploading={isUploading}
+            onChangeCapa={ehDono ? () => capaInputRef.current?.click() : null}
+            onUpdate={updateElement}
+            onDelete={deleteElement}
+            onUpdateConnection={updateConnection}
+            onDeleteConnection={deleteConnection}
+            onSetStartScreen={setStartScreen}
+          />
+        )}
       </div>
 
       {isPlaying && (
@@ -707,6 +852,8 @@ export default function CanvasPage() {
           onClose={() => setIsPlaying(false)}
         />
       )}
+
+      {isSharing && <ShareDialog project={project} onClose={() => setIsSharing(false)} />}
     </div>
   )
 }

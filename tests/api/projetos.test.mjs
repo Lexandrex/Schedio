@@ -268,7 +268,7 @@ test('o documento do canvas sobrevive à ida e volta no JSONB', async () => {
     connections: [{ id: 'cx-1', from: 'tx', to: 't1', trigger: 'click', transition: 'smart', duration: 350 }],
   }
 
-  assert.equal((await gravarConteudo(projeto.id, documento)).status, 204)
+  assert.equal((await gravarConteudo(projeto.id, documento)).status, 200)
 
   const lido = await amb.api(`/api/projects/${projeto.id}`, { token: dono.token })
   assert.deepEqual(lido.body.project.conteudo, documento, 'inclusive os runs de formatação por caractere')

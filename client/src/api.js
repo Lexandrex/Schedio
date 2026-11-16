@@ -17,7 +17,10 @@ async function handleResponse(response) {
   const data = contentType.includes('application/json') ? await response.json() : null
 
   if (!response.ok) {
-    throw new Error(data?.message || response.statusText || 'Não foi possível concluir a operação.')
+    const error = new Error(data?.message || response.statusText || 'Não foi possível concluir a operação.')
+    // Quem chama às vezes decide pelo código (o 409 de conflito no canvas).
+    error.status = response.status
+    throw error
   }
 
   return data

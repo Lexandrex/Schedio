@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
+import { destinoDepoisDoLogin } from '../routes/destino.js'
 
 export default function AuthLayout() {
   const location = useLocation()
@@ -25,7 +26,7 @@ export default function AuthLayout() {
   }
 
   if (user) {
-    return <Navigate to="/" replace />
+    return <Navigate to={destinoDepoisDoLogin()} replace />
   }
 
   return (
