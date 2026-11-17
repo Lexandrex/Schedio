@@ -2,13 +2,15 @@ import { useEffect, useRef, useState } from 'react'
 import {
   TOOLS,
   boxOf,
-  childrenOfScreen,
   clipsContent,
   createScreen,
   createShape,
   createText,
+  elementsInRect,
   isLocked,
   isScreen,
+  movableItems,
+  movePatches,
   normalizeRect,
   screenContaining,
   visibleElements,
@@ -20,6 +22,8 @@ import CanvasElement from './CanvasElement.jsx'
 import TextEditor from './TextEditor.jsx'
 
 const MIN_SIZE = 4
+/** Quanto o ponteiro anda (px de tela) para Shift sobre uma tela virar retângulo. */
+const MARQUEE_LIMIAR = 4
 const HANDLES = ['nw', 'ne', 'se', 'sw']
 /** Tamanho de quem nasce de um clique simples, sem arrastar: tela de celular e forma média. */
 const DEFAULT_SIZE = {
@@ -31,7 +35,8 @@ const DEFAULT_SIZE = {
 export default function CanvasStage({
   elements,
   connections,
-  selectedId,
+  // Seleção (RF-21): vários ids. Alças de redimensionar só com um selecionado.
+  selectedIds = [],
   selectedConnectionId,
   startScreenId,
   tool,
@@ -39,6 +44,7 @@ export default function CanvasStage({
   pendingFrom,
   onViewChange,
   onSelect,
+  onSelectMany,
   onSelectConnection,
   onCreate,
   onUpdate,
@@ -60,6 +66,8 @@ export default function CanvasStage({
   // no ponto entre eles, que também arrasta o mapa se os dedos andarem juntos.
   const toquesRef = useRef(new Map())
   const [draft, setDraft] = useState(null)
+  // Retângulo de seleção (Shift + arrastar no vazio), em coordenadas do mapa.
+  const [marquee, setMarquee] = useState(null)
   const [cursorPoint, setCursorPoint] = useState(null)
   const [editingId, setEditingId] = useState(null)
 
@@ -68,7 +76,8 @@ export default function CanvasStage({
   const [, setFontes] = useState(0)
   useEffect(() => onFontsLoaded(() => setFontes((versao) => versao + 1)), [])
 
-  const selected = elements.find((element) => element.id === selectedId) || null
+  const selected =
+    selectedIds.length === 1 ? elements.find((element) => element.id === selectedIds[0]) || null : null
   const editing = elements.find((element) => element.id === editingId && element.type === TOOLS.text) || null
 
   // Escape na janela, não só no campo: se o foco escapar (troca de janela, por
@@ -106,18 +115,15 @@ export default function CanvasStage({
     // O primeiro dedo já tinha começado um gesto: desfaz o que ele mexeu, já
     // que a intenção era o zoom.
     const drag = dragRef.current
-    if (drag?.mode === 'move') {
-      const patches = { [drag.origin.id]: { x: drag.origin.x, y: drag.origin.y } }
-      drag.carried.forEach((child) => {
-        patches[child.id] = { x: child.x, y: child.y }
-      })
-      onUpdateMany(patches)
+    if (drag?.mode === 'move' && drag.itens.length) {
+      onUpdateMany(movePatches(drag.itens, 0, 0))
     }
     if (drag?.mode === 'resize') {
       const { id, x, y, width, height } = drag.origin
       onUpdate(id, { x, y, width, height })
     }
     setDraft(null)
+    setMarquee(null)
     dragRef.current = { mode: 'pinch', ...medirPinca(), origin: { ...view } }
   }
 
@@ -209,18 +215,44 @@ export default function CanvasStage({
     }
 
     if (targetId) {
-      const element = elements.find((item) => item.id === targetId)
-      onSelect(targetId)
+      if (event.shiftKey) {
+        // Sobre uma tela, Shift pode ser as duas coisas: clique (põe ou tira
+        // a tela da seleção) ou o começo de um retângulo para pegar o que está
+        // dentro dela — o caso mais comum. Decide no `pointerup`, pelo quanto
+        // o ponteiro andou.
+        const alvo = elements.find((item) => item.id === targetId)
+        if (isScreen(alvo) && tool === TOOLS.select) {
+          dragRef.current = {
+            mode: 'marquee',
+            start: point,
+            rect: normalizeRect(point.x, point.y, point.x, point.y),
+            cliqueEm: targetId,
+            origemTela: { x: event.clientX, y: event.clientY },
+          }
+          return
+        }
+        // Shift + clique põe ou tira da seleção, sem arrastar.
+        onSelect(targetId, true)
+        return
+      }
 
-      // Arrastar uma tela leva junto o que está dentro dela — menos o que está
-      // travado, que é justamente o que o usuário pediu para ficar parado.
-      const carried = isScreen(element)
-        ? childrenOfScreen(elements, element)
-            .filter((child) => !isLocked(child))
-            .map((child) => ({ id: child.id, x: child.x, y: child.y }))
-        : []
+      // Agarrar um dos vários selecionados arrasta o grupo; agarrar outro
+      // seleciona só ele.
+      const grupo = selectedIds.length > 1 && selectedIds.includes(targetId) ? selectedIds : [targetId]
+      if (grupo.length === 1) onSelect(targetId)
 
-      dragRef.current = { mode: 'move', origin: { ...element }, start: point, carried }
+      // Tela leva junto o que está dentro dela — menos o que está travado,
+      // que é justamente o que o usuário pediu para ficar parado.
+      dragRef.current = { mode: 'move', start: point, itens: movableItems(elements, grupo) }
+      return
+    }
+
+    // Shift + arrastar no vazio: retângulo de seleção. Sem Shift continua
+    // sendo pan, para não mudar o gesto de sempre (nem o do toque).
+    if (event.shiftKey && tool === TOOLS.select) {
+      const rect = normalizeRect(point.x, point.y, point.x, point.y)
+      dragRef.current = { mode: 'marquee', start: point, rect }
+      setMarquee(rect)
       return
     }
 
@@ -264,6 +296,18 @@ export default function CanvasStage({
       return
     }
 
+    if (drag.mode === 'marquee') {
+      // Começou sobre uma tela: até andar alguns pixels ainda é um clique.
+      if (drag.cliqueEm && !drag.andou) {
+        const andou = Math.hypot(event.clientX - drag.origemTela.x, event.clientY - drag.origemTela.y)
+        if (andou < MARQUEE_LIMIAR) return
+        drag.andou = true
+      }
+      drag.rect = normalizeRect(drag.start.x, drag.start.y, point.x, point.y)
+      setMarquee(drag.rect)
+      return
+    }
+
     const deltaX = point.x - drag.start.x
     const deltaY = point.y - drag.start.y
 
@@ -277,16 +321,7 @@ export default function CanvasStage({
         else moveX = 0
       }
 
-      const patches = {
-        [drag.origin.id]: {
-          x: Math.round(drag.origin.x + moveX),
-          y: Math.round(drag.origin.y + moveY),
-        },
-      }
-      drag.carried.forEach((child) => {
-        patches[child.id] = { x: Math.round(child.x + moveX), y: Math.round(child.y + moveY) }
-      })
-      onUpdateMany(patches)
+      if (drag.itens.length) onUpdateMany(movePatches(drag.itens, moveX, moveY))
       return
     }
 
@@ -354,6 +389,14 @@ export default function CanvasStage({
       return
     }
     dragRef.current = null
+
+    // O retângulo troca a seleção pelo que ele pegou (vazio = nada).
+    if (drag?.mode === 'marquee') {
+      setMarquee(null)
+      if (drag.cliqueEm && !drag.andou) onSelect(drag.cliqueEm, true)
+      else onSelectMany(elementsInRect(elements, drag.rect))
+      return
+    }
 
     if (drag?.mode === 'create') {
       const { rect, type } = drag
@@ -610,6 +653,40 @@ export default function CanvasStage({
             strokeDasharray={`${4 / view.zoom} ${4 / view.zoom}`}
           />
         )}
+
+        {marquee && (
+          <rect
+            className="canvas-marquee"
+            x={marquee.x}
+            y={marquee.y}
+            width={marquee.width}
+            height={marquee.height}
+            fill="rgb(195 181 255 / 10%)"
+            stroke="#c3b5ff"
+            strokeWidth={1 / view.zoom}
+            strokeDasharray={`${4 / view.zoom} ${3 / view.zoom}`}
+            pointerEvents="none"
+          />
+        )}
+
+        {/* Vários selecionados: só o contorno de cada um, sem alças. */}
+        {selectedIds.length > 1 &&
+          selectedIds.map((id) => {
+            const element = byId.get(id)
+            if (!element) return null
+            return (
+              <rect
+                key={id}
+                data-selecionado={id}
+                {...boxOf(element)}
+                fill="none"
+                stroke={isLocked(element) ? '#e0c58a' : '#c3b5ff'}
+                strokeWidth={1.5 / view.zoom}
+                strokeDasharray={isLocked(element) ? `${5 / view.zoom} ${4 / view.zoom}` : undefined}
+                pointerEvents="none"
+              />
+            )
+          })}
 
         {selected && (
           <g pointerEvents="none">

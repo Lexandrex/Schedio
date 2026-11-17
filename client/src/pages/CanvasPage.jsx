@@ -11,15 +11,18 @@ import ShareDialog from '../canvas/ShareDialog.jsx'
 import { ICON_DEFAULT_SIZE } from '../canvas/iconLibrary.js'
 import {
   TOOLS,
+  alignPatches,
   boxOf,
-  childrenOfScreen,
   createIcon,
   createImage,
-  duplicateElement,
+  duplicateElements,
   isLocked,
   isScreen,
+  movableItems,
+  movePatches,
   reorderElement,
   screensOf,
+  visibleElements,
 } from '../canvas/elements.js'
 import { createConnection, pruneConnections } from '../canvas/connections.js'
 import { createStore, useStore } from '../canvas/store.js'
@@ -105,7 +108,10 @@ export default function CanvasPage({ visualizacao = null }) {
   const [startScreenId, setStartScreenId] = useState(inicial?.conteudo?.startScreen || null)
 
   const [tool, setTool] = useState(TOOLS.select)
-  const [selectedId, setSelectedId] = useState(null)
+  // Seleção de vários objetos (RF-21). Com exatamente um, o painel mostra as
+  // propriedades dele; com mais, as ações do grupo.
+  const [selectedIds, setSelectedIds] = useState([])
+  const selectedId = selectedIds.length === 1 ? selectedIds[0] : null
   const [selectedConnectionId, setSelectedConnectionId] = useState(null)
   const [pendingFrom, setPendingFrom] = useState(null)
   // Trecho selecionado no texto em edição ({ id, start, end }): o painel
@@ -137,6 +143,7 @@ export default function CanvasPage({ visualizacao = null }) {
   const elementsRef = useRef(elements)
   const connectionsRef = useRef(connections)
   const startScreenRef = useRef(startScreenId)
+  const selectedIdsRef = useRef(selectedIds)
   const dirtyRef = useRef(false)
   const conflitoRef = useRef(false)
   const savingRef = useRef(false)
@@ -148,6 +155,7 @@ export default function CanvasPage({ visualizacao = null }) {
     elementsRef.current = elements
     connectionsRef.current = connections
     startScreenRef.current = startScreenId
+    selectedIdsRef.current = selectedIds
     dirtyRef.current = isDirty
     conflitoRef.current = conflito
   })
@@ -311,21 +319,24 @@ export default function CanvasPage({ visualizacao = null }) {
     })
     // A primeira tela criada vira o ponto de partida da simulação.
     if (isScreen(element)) setStartScreenId((current) => current || element.id)
-    setSelectedId(element.id)
+    setSelectedIds([element.id])
     setSelectedConnectionId(null)
     setTool(TOOLS.select)
     setIsDirty(true)
   }, [])
 
-  const deleteElement = useCallback((elementId) => {
+  /** Exclui um elemento ou vários (a seleção inteira). */
+  const deleteElements = useCallback((alvo) => {
+    const ids = new Set(Array.isArray(alvo) ? alvo : [alvo])
+    if (!ids.size) return
     setElements((current) => {
-      const restantes = current.filter((element) => element.id !== elementId)
+      const restantes = current.filter((element) => !ids.has(element.id))
       // RN-12: ligação só existe entre elementos existentes.
       setConnections((atuais) => pruneConnections(atuais, restantes))
       return restantes
     })
-    setSelectedId((current) => (current === elementId ? null : current))
-    setStartScreenId((current) => (current === elementId ? null : current))
+    setSelectedIds((current) => current.filter((id) => !ids.has(id)))
+    setStartScreenId((current) => (ids.has(current) ? null : current))
     setIsDirty(true)
   }, [])
 
@@ -344,14 +355,28 @@ export default function CanvasPage({ visualizacao = null }) {
     setIsDirty(true)
   }, [])
 
-  const selectElement = useCallback((elementId) => {
-    setSelectedId(elementId)
+  /**
+   * Seleciona um elemento (ou nenhum, com null). Com `aditivo` (Shift/Ctrl +
+   * clique), põe ou tira o elemento da seleção atual em vez de trocá-la.
+   */
+  const selectElement = useCallback((elementId, aditivo = false) => {
+    setSelectedIds((current) => {
+      if (!elementId) return aditivo ? current : []
+      if (!aditivo) return [elementId]
+      return current.includes(elementId) ? current.filter((id) => id !== elementId) : [...current, elementId]
+    })
+    setSelectedConnectionId(null)
+  }, [])
+
+  /** Troca a seleção por vários de uma vez (retângulo de seleção, Ctrl+A). */
+  const selectMany = useCallback((ids) => {
+    setSelectedIds(ids)
     setSelectedConnectionId(null)
   }, [])
 
   const selectConnection = useCallback((connectionId) => {
     setSelectedConnectionId(connectionId)
-    setSelectedId(null)
+    setSelectedIds([])
   }, [])
 
   const reordenarElemento = useCallback((elementId, direcao) => {
@@ -362,32 +387,33 @@ export default function CanvasPage({ visualizacao = null }) {
     })
   }, [])
 
-  /** A cópia nasce sem as ligações do original — o percurso é redesenhado à mão. */
-  const duplicarElemento = useCallback((elementId) => {
-    const novos = duplicateElement(elementsRef.current, elementId)
+  /**
+   * Duplica um elemento ou vários; as cópias viram a seleção. A cópia nasce
+   * sem as ligações do original — o percurso é redesenhado à mão.
+   */
+  const duplicarElementos = useCallback((alvo) => {
+    const ids = Array.isArray(alvo) ? alvo : [alvo]
+    const { novos, selecao } = duplicateElements(elementsRef.current, ids)
     if (!novos.length) return
     setElements((current) => [...current, ...novos])
-    setSelectedId(novos[0].id)
+    setSelectedIds(selecao)
     setSelectedConnectionId(null)
     setIsDirty(true)
   }, [])
 
   /** Move pelo teclado. Como no arraste, tela leva junto o conteúdo não travado. */
-  const moverElemento = useCallback(
-    (elementId, deltaX, deltaY) => {
-      const atuais = elementsRef.current
-      const alvo = atuais.find((element) => element.id === elementId)
-      if (!alvo || isLocked(alvo)) return
+  const moverElementos = useCallback(
+    (ids, deltaX, deltaY) => {
+      const itens = movableItems(elementsRef.current, ids)
+      if (itens.length) updateElements(movePatches(itens, deltaX, deltaY))
+    },
+    [updateElements],
+  )
 
-      const patches = { [alvo.id]: { x: alvo.x + deltaX, y: alvo.y + deltaY } }
-      if (isScreen(alvo)) {
-        childrenOfScreen(atuais, alvo)
-          .filter((child) => !isLocked(child))
-          .forEach((child) => {
-            patches[child.id] = { x: child.x + deltaX, y: child.y + deltaY }
-          })
-      }
-      updateElements(patches)
+  const alinharSelecao = useCallback(
+    (modo) => {
+      const patches = alignPatches(elementsRef.current, selectedIdsRef.current, modo)
+      if (Object.keys(patches).length) updateElements(patches)
     },
     [updateElements],
   )
@@ -441,7 +467,7 @@ export default function CanvasPage({ visualizacao = null }) {
         const nova = createConnection(pendingFrom, elementId)
         setConnections((current) => [...current, nova])
         setSelectedConnectionId(nova.id)
-        setSelectedId(null)
+        setSelectedIds([])
         setIsDirty(true)
       }
 
@@ -547,6 +573,7 @@ export default function CanvasPage({ visualizacao = null }) {
       if (event.key === 'Escape') {
         setPendingFrom(null)
         setTool(TOOLS.select)
+        setSelectedIds([])
         return
       }
 
@@ -556,25 +583,36 @@ export default function CanvasPage({ visualizacao = null }) {
           deleteConnection(selectedConnectionId)
           return
         }
-        if (selectedId) {
+        if (selectedIds.length) {
           event.preventDefault()
-          deleteElement(selectedId)
+          deleteElements(selectedIds)
           return
         }
       }
 
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'd') {
         event.preventDefault()
-        if (selectedId) duplicarElemento(selectedId)
+        if (selectedIds.length) duplicarElementos(selectedIds)
+        return
+      }
+
+      // Ctrl+A: tudo o que dá para clicar no mapa (visível e não travado).
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') {
+        event.preventDefault()
+        selectMany(
+          visibleElements(elementsRef.current)
+            .filter((element) => !isLocked(element))
+            .map((element) => element.id),
+        )
         return
       }
 
       // Setas movem a seleção: 1px, ou 10px com Shift.
       const direcao = NUDGE[event.key]
-      if (direcao && selectedId) {
+      if (direcao && selectedIds.length) {
         event.preventDefault()
         const passo = event.shiftKey ? 10 : 1
-        moverElemento(selectedId, direcao[0] * passo, direcao[1] * passo)
+        moverElementos(selectedIds, direcao[0] * passo, direcao[1] * passo)
         return
       }
 
@@ -591,17 +629,19 @@ export default function CanvasPage({ visualizacao = null }) {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [
-    selectedId,
+    selectedIds,
     selectedConnectionId,
-    deleteElement,
+    deleteElements,
     deleteConnection,
-    duplicarElemento,
-    moverElemento,
+    duplicarElementos,
+    moverElementos,
+    selectMany,
     save,
     somenteLeitura,
   ])
 
   const selected = elements.find((element) => element.id === selectedId) || null
+  const selecionados = elements.filter((element) => selectedIds.includes(element.id))
   const selectedConnection = connections.find((item) => item.id === selectedConnectionId) || null
   const temTelas = elements.some(isScreen)
   const ehDono = !somenteLeitura && project?.papel !== 'colaborador'
@@ -729,7 +769,7 @@ export default function CanvasPage({ visualizacao = null }) {
           <CanvasStage
             elements={elements}
             connections={connections}
-            selectedId={selectedId}
+            selectedIds={selectedIds}
             selectedConnectionId={selectedConnectionId}
             startScreenId={startScreenId}
             tool={tool}
@@ -737,6 +777,7 @@ export default function CanvasPage({ visualizacao = null }) {
             pendingFrom={pendingFrom}
             onViewChange={setView}
             onSelect={selectElement}
+            onSelectMany={selectMany}
             onSelectConnection={selectConnection}
             onCreate={createElement}
             onUpdate={updateElement}
@@ -760,7 +801,7 @@ export default function CanvasPage({ visualizacao = null }) {
 
             <LayersPanel
               elements={elements}
-              selectedId={selectedId}
+              selectedIds={selectedIds}
               startScreenId={startScreenId}
               aberta={painelCamadas}
               onAbrir={() => setPainelCamadas(true)}
@@ -768,8 +809,8 @@ export default function CanvasPage({ visualizacao = null }) {
               onSelect={selectElement}
               onUpdate={updateElement}
               onReorder={reordenarElemento}
-              onDuplicate={duplicarElemento}
-              onDelete={deleteElement}
+              onDuplicate={duplicarElementos}
+              onDelete={deleteElements}
               onFocus={focarElemento}
             />
           </div>
@@ -828,6 +869,10 @@ export default function CanvasPage({ visualizacao = null }) {
         {!somenteLeitura && (
           <PropertiesPanel
             element={selected}
+            selecionados={selecionados}
+            onAlign={alinharSelecao}
+            onDuplicateSelection={() => duplicarElementos(selectedIds)}
+            onDeleteSelection={() => deleteElements(selectedIds)}
             connection={selectedConnection}
             elements={elements}
             textSelectionStore={textSelectionStore}
@@ -836,7 +881,7 @@ export default function CanvasPage({ visualizacao = null }) {
             isUploading={isUploading}
             onChangeCapa={ehDono ? () => capaInputRef.current?.click() : null}
             onUpdate={updateElement}
-            onDelete={deleteElement}
+            onDelete={deleteElements}
             onUpdateConnection={updateConnection}
             onDeleteConnection={deleteConnection}
             onSetStartScreen={setStartScreen}

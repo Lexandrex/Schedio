@@ -2,7 +2,14 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import {
+  ALIGN,
   DEFAULT_FILL,
+  alignPatches,
+  duplicateElements,
+  elementsInRect,
+  movableItems,
+  movePatches,
+  topLevelIds,
   REORDER,
   TOOLS,
   boxOf,
@@ -262,3 +269,85 @@ test('telas se reordenam entre telas, sem misturar com o conteúdo', () => {
   assert.deepEqual(proximo.map((e) => e.id), ['t2', 'd', 't1'])
 })
 
+
+/* Seleção de vários objetos (RF-21) */
+
+test('retângulo de seleção: formas que tocam entram, telas só se couberem inteiras', () => {
+  const elementos = [
+    tela('t1', 0, 0, 100, 100),
+    forma('dentro', 10, 10),
+    forma('borda', 95, 95, 20, 20),
+    forma('longe', 300, 300),
+    forma('travada', 20, 20, 10, 10, { locked: true }),
+    forma('oculta', 20, 20, 10, 10, { hidden: true }),
+  ]
+
+  // Puxado dentro da tela: pega o conteúdo, não a tela.
+  assert.deepEqual(elementsInRect(elementos, { x: 5, y: 5, width: 100, height: 100 }), ['dentro', 'borda'])
+  // Envolvendo a tela inteira: agora ela entra.
+  assert.deepEqual(elementsInRect(elementos, { x: -1, y: -1, width: 120, height: 120 }), ['t1', 'dentro', 'borda'])
+  assert.deepEqual(elementsInRect(elementos, { x: 500, y: 500, width: 10, height: 10 }), [])
+})
+
+test('seleção sem redundância: conteúdo de tela selecionada sai, ordem fica', () => {
+  const elementos = [tela('t1', 0, 0), forma('filho', 10, 10), forma('solto', 500, 500)]
+
+  assert.deepEqual(topLevelIds(elementos, ['solto', 'filho', 't1']), ['solto', 't1'])
+  assert.deepEqual(topLevelIds(elementos, ['filho', 'solto']), ['filho', 'solto'], 'sem a tela, o filho fica')
+  assert.deepEqual(topLevelIds(elementos, ['sumiu', 'solto']), ['solto'])
+})
+
+test('mover a seleção: cada um uma vez, tela leva o conteúdo, travado fica', () => {
+  const elementos = [
+    tela('t1', 0, 0),
+    forma('filho', 10, 10),
+    forma('filho-travado', 30, 30, 20, 20, { locked: true }),
+    forma('solto', 500, 500),
+    forma('travado', 600, 600, 20, 20, { locked: true }),
+  ]
+
+  const itens = movableItems(elementos, ['t1', 'filho', 'solto', 'travado'])
+  assert.deepEqual(itens.map((item) => item.id).sort(), ['filho', 'solto', 't1'])
+  assert.deepEqual(movePatches(itens, 5, -2.6), {
+    t1: { x: 5, y: -3 },
+    filho: { x: 15, y: 7 },
+    solto: { x: 505, y: 497 },
+  })
+})
+
+test('duplicar vários: tela vem com o conteúdo, e as cópias diretas viram a seleção', () => {
+  const elementos = [tela('t1', 0, 0), forma('filho', 10, 10), forma('solto', 500, 500)]
+
+  const { novos, selecao } = duplicateElements(elementos, ['t1', 'filho', 'solto'])
+  assert.equal(novos.length, 3, 'tela + filho + solto, sem copiar o filho duas vezes')
+  assert.equal(selecao.length, 2)
+  const porId = new Map(novos.map((item) => [item.id, item]))
+  assert.equal(porId.get(selecao[0]).origemId, 't1')
+  assert.equal(porId.get(selecao[1]).origemId, 'solto')
+})
+
+test('alinhar pela caixa que envolve todos; tela leva o conteúdo', () => {
+  const elementos = [
+    forma('a', 0, 0, 20, 20),
+    forma('b', 100, 50, 40, 10),
+    tela('t', 10, 200, 100, 100),
+    forma('dentro', 20, 210, 10, 10),
+  ]
+  const todos = ['a', 'b', 't']
+
+  assert.deepEqual(alignPatches(elementos, todos, ALIGN.esquerda), {
+    b: { x: 0, y: 50 },
+    t: { x: 0, y: 200 },
+    dentro: { x: 10, y: 210 },
+  })
+  // Caixa de x 0 a 140: as direitas vão a 140.
+  assert.deepEqual(alignPatches(elementos, ['a', 'b'], ALIGN.direita), { a: { x: 120, y: 0 } })
+  // Caixa de y 0 a 60 (a e b): meio em 30.
+  assert.deepEqual(alignPatches(elementos, ['a', 'b'], ALIGN.meio), { a: { x: 0, y: 20 }, b: { x: 100, y: 25 } })
+  assert.deepEqual(alignPatches(elementos, ['a'], ALIGN.topo), {}, 'um só não se alinha')
+  assert.deepEqual(
+    alignPatches([...elementos, forma('fixa', 900, 900, 20, 20, { locked: true })], ['a', 'fixa'], ALIGN.topo),
+    {},
+    'travado não conta nem se move',
+  )
+})

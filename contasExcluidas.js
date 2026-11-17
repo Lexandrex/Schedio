@@ -18,7 +18,17 @@ const { TERMOS } = require('./termos');
  * apagada no encerramento, o token de senha perde o sentido, e o acesso de
  * administrador não volta junto com a conta.
  */
-const FORA_DA_RESTAURACAO = ['foto', 'foto_public_id', 'password_reset_token_hash', 'password_reset_token_expires_at', 'admin', 'admin_desde'];
+const FORA_DA_RESTAURACAO = [
+  'foto',
+  'foto_public_id',
+  'password_reset_token_hash',
+  'password_reset_token_expires_at',
+  'email_novo',
+  'email_novo_token_hash',
+  'email_novo_expira_em',
+  'admin',
+  'admin_desde',
+];
 
 /**
  * Copia a conta e os projetos dela para `contas_excluidas`. Recebe o `client`

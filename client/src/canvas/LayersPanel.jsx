@@ -149,7 +149,8 @@ function LayerRow({
         <button
           type="button"
           className="layer-name"
-          onClick={() => onSelect(element.id)}
+          // Shift ou Ctrl/Cmd + clique põe ou tira da seleção (RF-21).
+          onClick={(event) => onSelect(element.id, event.shiftKey || event.ctrlKey || event.metaKey)}
           onDoubleClick={() => onEdit(element)}
           title={nome + ' — duplo clique para renomear'}
         >
@@ -193,7 +194,7 @@ function LayerRow({
  */
 export default function LayersPanel({
   elements,
-  selectedId,
+  selectedIds = [],
   startScreenId,
   aberta,
   onAbrir,
@@ -245,7 +246,7 @@ export default function LayersPanel({
   const linhaProps = (element, nested) => ({
     element,
     nested,
-    isSelected: element.id === selectedId,
+    isSelected: selectedIds.includes(element.id),
     isStart: element.id === startScreenId,
     isEditing: element.id === editandoId,
     rascunho,
@@ -314,12 +315,13 @@ export default function LayersPanel({
         )}
       </div>
 
-      {selectedId && (
+      {selectedIds.length > 0 && (
         <div className="layer-footer">
-          <button type="button" className="text-button" onClick={() => onDuplicate(selectedId)}>
+          {selectedIds.length > 1 && <span className="layer-contagem">{selectedIds.length} selecionados</span>}
+          <button type="button" className="text-button" onClick={() => onDuplicate(selectedIds)}>
             Duplicar
           </button>
-          <button type="button" className="text-button" onClick={() => onDelete(selectedId)}>
+          <button type="button" className="text-button" onClick={() => onDelete(selectedIds)}>
             Excluir
           </button>
         </div>

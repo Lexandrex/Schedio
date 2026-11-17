@@ -337,7 +337,6 @@ Requisitos relacionados à exploração e descoberta de projetos.
 | ID    | Requisito                                                                |
 | ----- | ------------------------------------------------------------------------ |
 | RF-19 | O sistema deve permitir **criação e edição de formas**                   |
-| RF-20 | O sistema deve permitir **desenhar utilizando a ferramenta pincel**      |
 | RF-21 | O sistema deve permitir **selecionar múltiplos objetos simultaneamente** |
 | RF-22 | O sistema deve permitir **alterar cores de elementos gráficos**          |
 | RF-23 | O sistema deve permitir **inserção e edição de texto**                   |
@@ -365,7 +364,6 @@ Requisitos relacionados à exploração e descoberta de projetos.
 | ID    | Requisito                                                          |
 | ----- | ------------------------------------------------------------------ |
 | RF-35 | O sistema deve permitir **visualizar projetos publicados**         |
-| RF-36 | O sistema deve permitir **comentar em projetos**                   |
 | RF-37 | O sistema deve permitir **favoritar projetos**                     |
 | RF-38 | O sistema deve permitir **dar like em projetos**                   |
 | RF-39 | O sistema deve permitir **reportar projetos**                      |

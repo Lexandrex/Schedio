@@ -327,3 +327,137 @@ export function duplicateElement(elements, id, offset = 16) {
   if (!isScreen(original)) return [novo]
   return [novo, ...childrenOfScreen(elements, original).map((element) => copiar(element, false))]
 }
+
+/*
+ * Seleção de vários objetos (RF-21). Regras puras, usadas pelo mapa, pelo
+ * painel e pelos atalhos de teclado.
+ */
+
+const tocam = (a, b) =>
+  a.x <= b.x + b.width && b.x <= a.x + a.width && a.y <= b.y + b.height && b.y <= a.y + a.height
+
+const cabe = (fora, dentro) =>
+  dentro.x >= fora.x &&
+  dentro.y >= fora.y &&
+  dentro.x + dentro.width <= fora.x + fora.width &&
+  dentro.y + dentro.height <= fora.y + fora.height
+
+/**
+ * Seleção por retângulo (Shift + arrastar no vazio). Formas, textos, imagens
+ * e ícones entram se tocam o retângulo; telas só se cabem inteiras — senão um
+ * retângulo puxado dentro de uma tela sempre a pegaria junto. Travados e
+ * ocultos ficam de fora, como no clique.
+ */
+export function elementsInRect(elements, rect) {
+  return elements
+    .filter((element) => !isHidden(element) && !isLocked(element))
+    .filter((element) => {
+      const box = boxOf(element)
+      return isScreen(element) ? cabe(rect, box) : tocam(rect, box)
+    })
+    .map((element) => element.id)
+}
+
+/**
+ * A seleção sem redundância: tira quem está dentro de uma tela também
+ * selecionada, porque a tela já leva o conteúdo junto ao mover, alinhar ou
+ * duplicar. Mantém a ordem dos ids e descarta os que não existem.
+ */
+export function topLevelIds(elements, ids) {
+  const porId = new Map(elements.map((element) => [element.id, element]))
+  const telas = ids.map((id) => porId.get(id)).filter((element) => element && isScreen(element))
+  return ids.filter((id) => {
+    const element = porId.get(id)
+    if (!element) return false
+    return isScreen(element) || !telas.some((tela) => isInsideScreen(element, tela))
+  })
+}
+
+/**
+ * O que anda quando a seleção é arrastada ou empurrada pelas setas, com a
+ * posição de partida: cada selecionado não travado e, se for tela, o conteúdo
+ * não travado dela — cada um uma vez só.
+ */
+export function movableItems(elements, ids) {
+  const porId = new Map(elements.map((element) => [element.id, element]))
+  const itens = new Map()
+  const incluir = (element) => itens.set(element.id, { id: element.id, x: element.x, y: element.y })
+
+  for (const id of topLevelIds(elements, ids)) {
+    const element = porId.get(id)
+    if (isLocked(element)) continue
+    incluir(element)
+    if (isScreen(element)) {
+      childrenOfScreen(elements, element).filter((child) => !isLocked(child)).forEach(incluir)
+    }
+  }
+  return [...itens.values()]
+}
+
+/** `{ id: { x, y } }` que desloca os itens de `movableItems` por (dx, dy). */
+export function movePatches(itens, dx, dy) {
+  const patches = {}
+  for (const item of itens) patches[item.id] = { x: Math.round(item.x + dx), y: Math.round(item.y + dy) }
+  return patches
+}
+
+/**
+ * Duplica cada selecionado (tela vem com o conteúdo, como no duplicar de um
+ * só). Devolve as cópias, na ordem, e os ids que viram a nova seleção — a
+ * cópia de cada selecionado, não a do conteúdo das telas.
+ */
+export function duplicateElements(elements, ids, offset = 16) {
+  const novos = []
+  const selecao = []
+  for (const id of topLevelIds(elements, ids)) {
+    const copias = duplicateElement(elements, id, offset)
+    if (!copias.length) continue
+    novos.push(...copias)
+    selecao.push(copias[0].id)
+  }
+  return { novos, selecao }
+}
+
+/** Alinhamentos da seleção, pela caixa que envolve todos os selecionados. */
+export const ALIGN = {
+  esquerda: 'esquerda',
+  centro: 'centro',
+  direita: 'direita',
+  topo: 'topo',
+  meio: 'meio',
+  base: 'base',
+}
+
+/**
+ * Alinha os selecionados (não travados) pela caixa que envolve todos eles.
+ * Uma tela alinhada leva o conteúdo junto. Com menos de dois, nada muda.
+ */
+export function alignPatches(elements, ids, modo) {
+  const porId = new Map(elements.map((element) => [element.id, element]))
+  const alvos = topLevelIds(elements, ids)
+    .map((id) => porId.get(id))
+    .filter((element) => !isLocked(element))
+  if (alvos.length < 2) return {}
+
+  const caixas = alvos.map(boxOf)
+  const esquerda = Math.min(...caixas.map((box) => box.x))
+  const topo = Math.min(...caixas.map((box) => box.y))
+  const direita = Math.max(...caixas.map((box) => box.x + box.width))
+  const base = Math.max(...caixas.map((box) => box.y + box.height))
+
+  const patches = {}
+  alvos.forEach((element, index) => {
+    const box = caixas[index]
+    let dx = 0
+    let dy = 0
+    if (modo === ALIGN.esquerda) dx = esquerda - box.x
+    if (modo === ALIGN.centro) dx = (esquerda + direita) / 2 - (box.x + box.width / 2)
+    if (modo === ALIGN.direita) dx = direita - (box.x + box.width)
+    if (modo === ALIGN.topo) dy = topo - box.y
+    if (modo === ALIGN.meio) dy = (topo + base) / 2 - (box.y + box.height / 2)
+    if (modo === ALIGN.base) dy = base - (box.y + box.height)
+    if (!dx && !dy) return
+    Object.assign(patches, movePatches(movableItems(elements, [element.id]), dx, dy))
+  })
+  return patches
+}

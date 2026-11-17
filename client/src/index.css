@@ -2888,6 +2888,24 @@ a.editor-card-cover {
   }
 }
 
+/* Seleção de vários objetos (RF-21) */
+.prop-align {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.prop-align .editor-card-open {
+  padding: 5px 4px;
+  text-align: center;
+}
+
+.layer-contagem {
+  margin-right: auto;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+}
+
 /* Responsive */
 @media (max-width: 520px), (orientation: landscape) and (max-height: 500px) {
   /* Fixa no canto, a marca cobriria o cartão quando ele ocupa a tela toda. */

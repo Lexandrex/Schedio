@@ -6,6 +6,7 @@ import ProfileWorks from '../components/ProfileWorks.jsx'
 import ProfilePhotoField from '../components/ProfilePhotoField.jsx'
 import TermsDialog from '../components/TermsDialog.jsx'
 import MyReports from '../components/MyReports.jsx'
+import ChangeEmailCard from '../components/ChangeEmailCard.jsx'
 
 const DEFAULT_COLOR = '#19181a'
 const BIO_LIMIT = 280
@@ -161,6 +162,8 @@ export default function AccountPage() {
               </p>
             )}
           </section>
+
+          <ChangeEmailCard />
 
           <MyReports />
 

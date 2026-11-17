@@ -1,4 +1,5 @@
 import {
+  ALIGN,
   TOOLS,
   TYPE_LABEL,
   clipsContent,
@@ -412,6 +413,60 @@ function ConnectionSection({ connection, elements, onUpdate, onDelete }) {
   )
 }
 
+const ALINHAMENTOS = [
+  { modo: ALIGN.esquerda, rotulo: 'Esquerda' },
+  { modo: ALIGN.centro, rotulo: 'Centro' },
+  { modo: ALIGN.direita, rotulo: 'Direita' },
+  { modo: ALIGN.topo, rotulo: 'Topo' },
+  { modo: ALIGN.meio, rotulo: 'Meio' },
+  { modo: ALIGN.base, rotulo: 'Base' },
+]
+
+/**
+ * Vários selecionados (RF-21): o que vale para o grupo — alinhar, duplicar e
+ * excluir. Propriedades de um elemento só aparecem com um selecionado.
+ */
+function MultiSection({ selecionados, onAlign, onDuplicate, onDelete }) {
+  const tipos = [...new Set(selecionados.map((element) => TYPE_LABEL[element.type] || element.type))]
+
+  return (
+    <aside className="properties-panel">
+      <h2>Propriedades</h2>
+      <p className="properties-type">{selecionados.length} elementos selecionados</p>
+      <p className="prop-hint">{tipos.join(', ')}</p>
+
+      <section className="prop-section">
+        <h3>Alinhar</h3>
+        <div className="prop-align" role="group" aria-label="Alinhar a seleção">
+          {ALINHAMENTOS.map(({ modo, rotulo }) => (
+            <button key={modo} className="editor-card-open" type="button" onClick={() => onAlign(modo)}>
+              {rotulo}
+            </button>
+          ))}
+        </div>
+        <p className="prop-hint">
+          Pela caixa que envolve todos. Uma tela leva o conteúdo junto; travados não se movem.
+        </p>
+      </section>
+
+      <section className="prop-section">
+        <h3>Seleção</h3>
+        <p className="prop-hint">
+          Shift + clique põe ou tira um elemento; Shift + arrastar no vazio seleciona por área; Ctrl+A seleciona
+          tudo. Arraste qualquer um deles para mover o grupo.
+        </p>
+        <button className="text-button prop-reset" type="button" onClick={onDuplicate}>
+          Duplicar os {selecionados.length}
+        </button>
+      </section>
+
+      <button className="danger-button" type="button" onClick={onDelete}>
+        Excluir os {selecionados.length}
+      </button>
+    </aside>
+  )
+}
+
 /** Sem seleção o painel vira o lugar das configurações do projeto. */
 function ProjectSection({ capa, isUploading, onChangeCapa }) {
   return (
@@ -453,6 +508,7 @@ function ProjectSection({ capa, isUploading, onChangeCapa }) {
 
 export default function PropertiesPanel({
   element,
+  selecionados = [],
   connection,
   elements = [],
   textSelectionStore = SEM_SELECAO,
@@ -465,8 +521,22 @@ export default function PropertiesPanel({
   onUpdateConnection,
   onDeleteConnection,
   onSetStartScreen,
+  onAlign,
+  onDuplicateSelection,
+  onDeleteSelection,
 }) {
   const textSelection = useStore(textSelectionStore)
+
+  if (selecionados.length > 1) {
+    return (
+      <MultiSection
+        selecionados={selecionados}
+        onAlign={onAlign}
+        onDuplicate={onDuplicateSelection}
+        onDelete={onDeleteSelection}
+      />
+    )
+  }
 
   if (connection) {
     return (

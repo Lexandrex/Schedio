@@ -311,8 +311,11 @@ function papelAdmin(user) {
 }
 
 app.get('/api/auth/me', requireAuth, rota(async (request, response) => {
+  // `email_novo`: troca de e-mail esperando o código (RF-04), se ainda no prazo.
   const result = await query(
-    'SELECT id, email, nome, bio, foto, cor, termos_versao, termos_aceitos_em, admin FROM users WHERE id = $1',
+    `SELECT id, email, nome, bio, foto, cor, termos_versao, termos_aceitos_em, admin,
+            CASE WHEN email_novo_expira_em > NOW() THEN email_novo END AS email_novo
+     FROM users WHERE id = $1`,
     [request.userId],
   );
   const user = result.rows[0];
@@ -342,6 +345,107 @@ app.patch('/api/users/me', requireAuth, rota(async (request, response) => {
     [nome, bio, cor, request.userId],
   );
   return response.json({ user: result.rows[0] });
+}));
+
+/*
+ * Troca do e-mail (RF-04), em duas etapas, como o cadastro: o novo endereço
+ * só vale depois de confirmado pelo código enviado a ele. Até lá a conta
+ * continua entrando com o e-mail atual.
+ */
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+app.post('/api/users/me/email', requireAuth, rota(async (request, response) => {
+  const email = normalizarEmail(String(request.body.email || ''));
+  if (!email || !EMAIL_PATTERN.test(email) || email.length > 255) {
+    return response.status(400).json({ message: 'Informe um e-mail válido.' });
+  }
+
+  const result = await query('SELECT email, senha, admin FROM users WHERE id = $1', [request.userId]);
+  const user = result.rows[0];
+  if (!user) return response.status(401).json({ message: SESSAO_INVALIDA });
+  if (!await bcrypt.compare(request.body.password || '', user.senha)) {
+    return response.status(401).json({ message: 'Senha incorreta.' });
+  }
+  if (email === user.email) {
+    return response.status(400).json({ message: 'Esse já é o e-mail da sua conta.' });
+  }
+  // O dono é reconhecido pelo e-mail da configuração: trocar aqui tiraria o
+  // acesso de administrador dele sem aviso.
+  if (papelAdmin(user).dono) {
+    return response.status(400).json({
+      message: 'O e-mail da conta dona da plataforma vem da configuração (ADMIN_DONO_EMAIL). Mude a configuração antes.',
+    });
+  }
+  const emUso = await query('SELECT 1 FROM users WHERE email = $1', [email]);
+  if (emUso.rows[0]) return response.status(409).json({ message: 'Este e-mail já está cadastrado.' });
+  if (!mailTransport) {
+    return response.status(503).json({ message: 'O serviço de e-mail ainda não está configurado.' });
+  }
+
+  const { codigo, hash } = await novoCodigo();
+  await query(
+    `UPDATE users SET email_novo = $1, email_novo_token_hash = $2, email_novo_expira_em = NOW() + INTERVAL '15 minutes'
+     WHERE id = $3`,
+    [email, hash, request.userId],
+  );
+  await enviarEmail({
+    to: email,
+    subject: 'Confirme seu novo e-mail — Schedio Drasis',
+    text: `Olá!\n\nUse o código ${codigo} para confirmar este endereço como o novo e-mail da sua conta no Schedio Drasis. Ele expira em 15 minutos.\n\nSe você não pediu essa troca, ignore esta mensagem.`,
+    html: `<p>Olá!</p><p>Use o código abaixo para confirmar este endereço como o novo e-mail da sua conta no Schedio Drasis:</p><p style="font-size:24px;font-weight:bold;letter-spacing:4px">${codigo}</p><p>Ele expira em 15 minutos.</p><p>Se você não pediu essa troca, ignore esta mensagem.</p>`,
+  });
+
+  return response.json({
+    email_novo: email,
+    message: `Enviamos um código para ${email}. Digite-o para concluir a troca.`,
+    previewUrl: previewUrl(),
+  });
+}));
+
+app.post('/api/users/me/email/confirmar', requireAuth, rota(async (request, response) => {
+  const result = await query(
+    `SELECT email, email_novo, email_novo_token_hash FROM users
+     WHERE id = $1 AND email_novo IS NOT NULL AND email_novo_expira_em > NOW()`,
+    [request.userId],
+  );
+  const pendente = result.rows[0];
+  if (!pendente || !await bcrypt.compare(String(request.body.code || ''), pendente.email_novo_token_hash)) {
+    return response.status(400).json({ message: 'Código inválido ou expirado.' });
+  }
+
+  let atualizado;
+  try {
+    atualizado = await query(
+      `UPDATE users SET email = email_novo, email_novo = NULL, email_novo_token_hash = NULL, email_novo_expira_em = NULL
+       WHERE id = $1
+       RETURNING id, email, nome, bio, foto, cor`,
+      [request.userId],
+    );
+  } catch (error) {
+    // Alguém confirmou um cadastro com esse e-mail no meio do caminho.
+    if (error.code !== '23505') throw error;
+    return response.status(409).json({ message: 'Este e-mail já está cadastrado.' });
+  }
+
+  // O endereço antigo fica sabendo: se não foi a pessoa, ela tem por onde reagir.
+  if (mailTransport) {
+    enviarEmail({
+      to: pendente.email,
+      subject: 'O e-mail da sua conta foi alterado — Schedio Drasis',
+      text: `O e-mail da sua conta no Schedio Drasis foi alterado para ${pendente.email_novo}. Se não foi você, recupere o acesso pelo novo endereço ou fale com a administração da plataforma.`,
+    }).catch((error) => console.error('Aviso de troca de e-mail não enviado:', error.message));
+  }
+
+  return response.json({ user: atualizado.rows[0], message: 'E-mail alterado com sucesso.' });
+}));
+
+/** Desiste da troca pendente. */
+app.delete('/api/users/me/email', requireAuth, rota(async (request, response) => {
+  await query(
+    'UPDATE users SET email_novo = NULL, email_novo_token_hash = NULL, email_novo_expira_em = NULL WHERE id = $1',
+    [request.userId],
+  );
+  return response.status(204).send();
 }));
 
 app.delete('/api/users/me', requireAuth, rota(async (request, response) => {
