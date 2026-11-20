@@ -1,9 +1,11 @@
 # Pipeline de CI/CD do Schedio Drasis.
 #
 # Ordem: `versao` decide qual commit vale para a execução inteira; depois
-# `frontend` e `testes` rodam em paralelo, e qualquer passo que falhe (lint,
-# build, teste ou meta de cobertura) deixa o job vermelho e bloqueia o merge do
-# PR. `deploy` só começa depois que os dois passam, e só na main.
+# `frontend` e `testes` rodam em paralelo, e `analise` (SonarCloud) depois de
+# `testes`, porque lê a cobertura dele. Qualquer passo que falhe (npm audit,
+# lint, build, teste, meta de cobertura ou Quality Gate) deixa o job vermelho e
+# bloqueia o merge do PR. `deploy` só começa depois que os três passam, e só na
+# main. O CodeQL roda à parte (codeql.yml).
 #
 # Gatilhos: todo push na main, todo pull request e à mão pela aba Actions
 # (workflow_dispatch). Para rodar SÓ à mão, apague `push` e `pull_request`.
@@ -79,6 +81,9 @@ jobs:
           cache: npm
           cache-dependency-path: client/package-lock.json
       - run: npm ci
+      # Dependências que vão para o navegador: falha com vulnerabilidade alta
+      # ou crítica conhecida. As de desenvolvimento (Vite, Vitest) não vão ao ar.
+      - run: npm audit --omit=dev --audit-level=high
       - run: npm run lint
       - run: npm run build
 
@@ -119,6 +124,9 @@ jobs:
             package-lock.json
             client/package-lock.json
       - run: npm ci
+      # Dependências de produção do servidor: falha com vulnerabilidade alta ou
+      # crítica conhecida (as mesmas do `npm ci --omit=dev` do deploy).
+      - run: npm audit --omit=dev --audit-level=high
       # O client tem o próprio package.json: Vitest e Testing Library moram lá.
       - run: npm ci --prefix client
       # Roda a suite inteira e confere as metas: 75% backend, 25% frontend.
@@ -131,13 +139,55 @@ jobs:
           name: cobertura
           path: coverage/
 
+  # Análise estática no SonarCloud (bugs, code smells, duplicação, security
+  # hotspots), com a cobertura dos dois runners. Configuração em
+  # sonar-project.properties; o job espera o Quality Gate e falha se ele
+  # reprovar, o que também segura o deploy. A segurança do código é vista
+  # também pelo CodeQL (codeql.yml), e a das dependências pelo `npm audit` e
+  # pelo Dependabot.
+  analise:
+    name: Análise estática (SonarCloud)
+    needs: [versao, testes]
+    runs-on: ubuntu-latest
+    # Pulado em dois casos:
+    # - PR vindo de fork, que não recebe secrets (sem token não há scan);
+    # - rollback (Run workflow com `versao`): a versão antiga já passou pelo
+    #   Quality Gate quando entrou na main — ou é anterior a ele e nem tem
+    #   sonar-project.properties —, e reanalisá-la só travaria a volta.
+    if: >-
+      inputs.versao == '' &&
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    permissions:
+      contents: read
+      pull-requests: read # o Sonar comenta a decoração do PR
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.versao.outputs.sha }}
+          fetch-depth: 0 # o Sonar usa o blame para separar código novo do antigo
+      - uses: actions/download-artifact@v4
+        with:
+          name: cobertura
+          path: coverage/
+      - uses: SonarSource/sonarqube-scan-action@v5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
   # Publica no Azure App Service. Nenhum passo usa SSH, FTP ou senha do Azure:
   # o GitHub prova quem é por um token OIDC de curta duração (azure/login).
   deploy:
     name: Deploy em produção
     # `versao` entra na lista só para o job poder ler o SHA que ela decidiu.
-    needs: [versao, frontend, testes]
-    if: github.ref == 'refs/heads/main'
+    needs: [versao, frontend, testes, analise]
+    # `analise` pulada (só no rollback, na main) não impede o deploy; reprovada,
+    # impede. Sem o `!cancelled()` o GitHub nem avaliaria a condição com um job
+    # pulado na lista.
+    if: >-
+      !cancelled() && github.ref == 'refs/heads/main' &&
+      needs.versao.result == 'success' &&
+      needs.frontend.result == 'success' &&
+      needs.testes.result == 'success' &&
+      (needs.analise.result == 'success' || needs.analise.result == 'skipped')
     runs-on: ubuntu-latest
     # Os secrets e vars abaixo são os do Environment, liberado só para a main.
     environment:

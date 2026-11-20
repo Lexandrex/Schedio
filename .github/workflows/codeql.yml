@@ -1,0 +1,49 @@
+# Análise de segurança do código com CodeQL (GitHub Advanced Security, grátis
+# em repositório público). Procura vulnerabilidades no backend e no client:
+# injeção de SQL, XSS, path traversal, redirecionamento aberto, falta de rate
+# limit, uso inseguro de criptografia etc.
+#
+# Os alertas aparecem em Security → Code scanning. Cada um é corrigido ou
+# dispensado com justificativa (Dismiss → "False positive" / "Won't fix").
+#
+# Este workflow é a configuração "avançada": em Settings → Code security, o
+# CodeQL "Default setup" tem de ficar DESLIGADO, senão os dois conflitam.
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '27 6 * * 1' # toda segunda, para pegar consultas novas do CodeQL
+  workflow_dispatch:
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  analisar:
+    name: CodeQL (JavaScript)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write # publica os alertas em Code scanning
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          # O conjunto padrão mais as consultas de segurança de precisão menor.
+          queries: security-extended
+          config: |
+            paths-ignore:
+              - node_modules
+              - client/node_modules
+              - client/dist
+              - coverage
+      # JavaScript não precisa de build: o CodeQL lê o código-fonte.
+      - uses: github/codeql-action/analyze@v3
+        with:
+          category: /language:javascript-typescript
