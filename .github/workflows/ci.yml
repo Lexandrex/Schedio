@@ -41,7 +41,7 @@ jobs:
     outputs:
       sha: ${{ steps.resolver.outputs.sha }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         if: inputs.versao != ''
         with:
           fetch-depth: 0 # a história inteira, para achar commits antigos
@@ -72,7 +72,7 @@ jobs:
       run:
         working-directory: client
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.versao.outputs.sha }}
       - uses: actions/setup-node@v4
@@ -113,7 +113,7 @@ jobs:
       DB_NAME: schedio
       JWT_SECRET: segredo-de-ci
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.versao.outputs.sha }}
       - uses: actions/setup-node@v4
@@ -161,7 +161,7 @@ jobs:
       contents: read
       pull-requests: read # o Sonar comenta a decoração do PR
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.versao.outputs.sha }}
           fetch-depth: 0 # o Sonar usa o blame para separar código novo do antigo
@@ -202,7 +202,7 @@ jobs:
       SERVIDOR_BANCO: ${{ vars.AZURE_DB_SERVER }}
       APP_URL: ${{ vars.APP_URL }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.versao.outputs.sha }}
       - uses: actions/setup-node@v4
