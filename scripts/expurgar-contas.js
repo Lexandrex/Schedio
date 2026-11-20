@@ -18,4 +18,8 @@ const { expurgarContasVencidas } = require('../contasExcluidas');
   } finally {
     await pool.end();
   }
-})();
+})().catch((error) => {
+  // Só chega aqui se o próprio `pool.end()` falhar.
+  console.error('Falha ao encerrar a conexão com o banco:', error.message);
+  process.exitCode = 1;
+});

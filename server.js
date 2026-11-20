@@ -13,6 +13,7 @@ const storage = require('./storage');
 const { MAX_TAGS_LENGTH, parseTags, formatTags } = require('./tags');
 const { TERMOS } = require('./termos');
 const { arquivarConta, restaurarConta, expurgarContasVencidas } = require('./contasExcluidas');
+const tentativasLogin = require('./tentativasLogin');
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
@@ -131,6 +132,9 @@ async function projetoEditavel(projetoId, userId) {
 }
 
 const app = express();
+// Sem o `X-Powered-By: Express`, que entrega o framework a quem procura
+// vulnerabilidades conhecidas dele (regra S5689 do Sonar).
+app.disable('x-powered-by');
 
 let mailTransport;
 let mailPreviewUrl = null;
@@ -283,18 +287,34 @@ app.post('/api/auth/register', rota(async (request, response) => {
   });
 }));
 
-app.post('/api/auth/login', rota(async (request, response) => {
-  const { email, password } = request.body;
-  const result = await query('SELECT id, email, senha FROM users WHERE email = $1', [normalizarEmail(email)]);
-  const user = result.rows[0];
+/** 429 com `Retry-After`: o e-mail errou a senha vezes demais (ver tentativasLogin.js). */
+function recusarPorBloqueio(response, segundos) {
+  response.set('Retry-After', String(segundos));
+  return response.status(429).json({ message: tentativasLogin.mensagemDeBloqueio(segundos) });
+}
 
-  if (!user) {
+app.post('/api/auth/login', rota(async (request, response) => {
+  const { password } = request.body;
+  const email = normalizarEmail(typeof request.body.email === 'string' ? request.body.email : '');
+  if (!email) {
     return response.status(401).json({ message: 'E-mail não cadastrado.' });
   }
-  if (!await bcrypt.compare(password || '', user.senha)) {
-    return response.status(401).json({ message: 'Senha incorreta.' });
+
+  // O bloqueio vem antes de tudo, até da senha certa: senão ele não protegeria nada.
+  const bloqueio = await tentativasLogin.segundosDeBloqueio(query, email);
+  if (bloqueio) return recusarPorBloqueio(response, bloqueio);
+
+  const result = await query('SELECT id, email, senha FROM users WHERE email = $1', [email]);
+  const user = result.rows[0];
+
+  // E-mail inexistente também conta: a contagem não depende de a conta existir.
+  if (!user || !await bcrypt.compare(password || '', user.senha)) {
+    const { segundos } = await tentativasLogin.registrarFalha(query, email);
+    if (segundos) return recusarPorBloqueio(response, segundos);
+    return response.status(401).json({ message: user ? 'Senha incorreta.' : 'E-mail não cadastrado.' });
   }
 
+  await tentativasLogin.limparFalhas(query, email);
   return response.json({ user: { id: user.id, email: user.email }, token: signToken(user) });
 }));
 
@@ -1522,9 +1542,9 @@ app.use((error, _request, response, _next) => {
 });
 
 /**
- * Expurgo das contas excluídas vencidas: na subida e uma vez por dia. O
- * `unref` não deixa o timer segurar o processo de pé. Também roda à mão com
- * `npm run contas:expurgar`.
+ * Expurgo das contas excluídas vencidas (e das sobras de links e de tentativas
+ * de login): na subida e uma vez por dia. O `unref` não deixa o timer segurar
+ * o processo de pé. O das contas também roda à mão com `npm run contas:expurgar`.
  */
 const UM_DIA_MS = 24 * 60 * 60 * 1000;
 
@@ -1536,6 +1556,8 @@ function expurgar() {
   // some da tabela.
   query('DELETE FROM projeto_links WHERE expira_em <= NOW()')
     .catch((error) => console.error('Limpeza de links vencidos falhou:', error.message));
+  tentativasLogin.expurgarTentativas(query)
+    .catch((error) => console.error('Limpeza das tentativas de login falhou:', error.message));
 }
 
 expurgar();

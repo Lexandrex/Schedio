@@ -197,7 +197,7 @@ export async function iniciarAmbiente(sufixo = '', { donoEmail = '' } = {}) {
     } catch {
       corpo = texto // 404 do Express vem em HTML — ver CLAUDE.md
     }
-    return { status: resposta.status, body: corpo }
+    return { status: resposta.status, body: corpo, headers: resposta.headers }
   }
 
   /** Troca o hash do código pendente por um que conhecemos. */

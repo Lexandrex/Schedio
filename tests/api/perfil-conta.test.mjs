@@ -208,6 +208,12 @@ test('sem Cloudinary, o app reporta o armazenamento como não configurado', asyn
   assert.equal(body.storage, 'not-configured')
 })
 
+test('as respostas não dizem que o servidor é Express (sem X-Powered-By)', async () => {
+  const { headers } = await amb.api('/api/health')
+
+  assert.equal(headers.get('x-powered-by'), null)
+})
+
 test('sem Cloudinary, as rotas de imagem dão 503 nomeando o que falta', async () => {
   const projeto = await obra('Obra com imagem')
 

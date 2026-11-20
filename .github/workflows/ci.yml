@@ -80,7 +80,12 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: client/package-lock.json
-      - run: npm ci
+      # `--ignore-scripts` em todo `npm ci` deste arquivo: um pacote comprometido
+      # não executa nada na instalação (regra S6505 do Sonar). Nenhuma
+      # dependência das duas metades tem script de instalação (`hasInstallScript`
+      # não aparece nos lockfiles); os binários nativos do Vite e do oxlint vêm
+      # como optionalDependencies, sem postinstall.
+      - run: npm ci --ignore-scripts
       # Dependências que vão para o navegador: falha com vulnerabilidade alta
       # ou crítica conhecida. As de desenvolvimento (Vite, Vitest) não vão ao ar.
       - run: npm audit --omit=dev --audit-level=high
@@ -123,12 +128,12 @@ jobs:
           cache-dependency-path: |
             package-lock.json
             client/package-lock.json
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       # Dependências de produção do servidor: falha com vulnerabilidade alta ou
       # crítica conhecida (as mesmas do `npm ci --omit=dev` do deploy).
       - run: npm audit --omit=dev --audit-level=high
       # O client tem o próprio package.json: Vitest e Testing Library moram lá.
-      - run: npm ci --prefix client
+      - run: npm ci --ignore-scripts --prefix client
       # Roda a suite inteira e confere as metas: 75% backend, 25% frontend.
       # node:test sob o c8 (backend + módulos puros do client) e, em seguida,
       # o Vitest com os testes de componente; o frontend soma os dois.
@@ -169,7 +174,7 @@ jobs:
         with:
           name: cobertura
           path: coverage/
-      - uses: SonarSource/sonarqube-scan-action@v5
+      - uses: SonarSource/sonarqube-scan-action@2f77a1ec69fb1d595b06f35ab27e97605bdef703 # v5
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
@@ -215,11 +220,11 @@ jobs:
 
       - name: Build do client
         run: |
-          npm ci --prefix client
+          npm ci --ignore-scripts --prefix client
           npm run build:client
 
       - name: Dependências de produção do servidor
-        run: npm ci --omit=dev
+        run: npm ci --ignore-scripts --omit=dev
 
       # O smoke test lê este arquivo para provar qual commit está no ar. É um
       # arquivo estático, então funciona também ao voltar para versões antigas.
@@ -227,7 +232,7 @@ jobs:
         run: git rev-parse HEAD > client/dist/versao.txt
 
       - name: Login no Azure (OIDC)
-        uses: azure/login@v2
+        uses: azure/login@7184910d9eb2b1c5e48f7073824a90609bb9b6d6 # v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -304,7 +309,7 @@ jobs:
         run: zip -r -q pacote.zip package.json ./*.js db scripts node_modules client/dist
 
       - name: Publicar no App Service
-        uses: azure/webapps-deploy@v3
+        uses: azure/webapps-deploy@02a81bead70021f5284939794bcec79c271ab383 # v3
         with:
           app-name: ${{ vars.AZURE_APP_NAME }}
           package: pacote.zip

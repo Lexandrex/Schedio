@@ -308,8 +308,10 @@ Requisitos relacionados à criação e gerenciamento de contas de usuário.
 | RF-02 | O sistema deve permitir **login de usuário**                                        |
 | RF-03 | O sistema deve permitir **recuperação de senha por e-mail**                         |
 | RF-04 | O sistema deve permitir **edição do e-mail da conta**                               |
-| RF-05 | O sistema deve permitir **escolher a categoria da sessão (Editor / Telespectador)** |
-| RF-06 | O sistema deve permitir **trocar a categoria durante a sessão**                     |
+| RF-05 | O sistema deve permitir **escolher a categoria da sessão (Editor / Telespectador)** ✅ Implementado |
+| RF-06 | O sistema deve permitir **trocar a categoria durante a sessão** ✅ Implementado |
+
+> **RF-05 e RF-06 — como foram implementados:** depois do login, o menu da conta alterna entre **Telespectador** (*Início*, `/`: vitrine, apresentação e leitura das obras publicadas) e **Editor** (*Editor*, `/editor`: os próprios projetos e o canvas), sem sair da sessão. Nas obras de outras pessoas, o link de **visualização** abre o canvas só para leitura e o de **colaboração** dá acesso de edição (RF-18).
 
 ## Navegação de Projetos
 Requisitos relacionados à exploração e descoberta de projetos.
@@ -392,7 +394,7 @@ Esta seção define as regras que controlam o comportamento do sistema.
 |----|------|
 | RN-01 | O usuário deve estar autenticado para acessar funcionalidades do sistema |
 | RN-02 | O e-mail do usuário deve ser único no sistema |
-| RN-03 | A troca de categoria (Editor/Telespectador) deve ser permitida apenas durante sessão ativa |
+| RN-03 | A troca de categoria (Editor/Telespectador) deve ser permitida apenas durante sessão ativa ✅ Implementado: as duas áreas exigem sessão (`RequireAuth`); sem ela, a pessoa vai para o login |
 
 ---
 

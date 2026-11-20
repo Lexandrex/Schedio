@@ -156,6 +156,11 @@ Nos dois casos os testes rodam de novo, sobre a versão escolhida. É mais lento
 garante que o que volta ao ar passa nos testes. A contrapartida: uma versão cujos
 testes falhem não consegue voltar por aqui.
 
+A análise do SonarCloud (job `analise`) é a exceção: no **Run workflow com
+`versao`** ela é pulada, e o deploy segue. A versão antiga já passou pelo Quality
+Gate quando entrou na `main` (ou é anterior a ele e nem tem
+`sonar-project.properties`, e o scan falharia). No `git revert` ela roda normalmente.
+
 **Migration não volta.** As migrations são só de ida, então o banco fica como está e
 só o código volta. Por isso a regra é migration aditiva (`ADD COLUMN ... DEFAULT`): o
 código antigo continua funcionando com a coluna nova. O `db:migrate` da versão antiga
@@ -254,7 +259,7 @@ disparar, e push ou commit não rodam este workflow.
 
 ## 8. Desligar tudo
 
-Depois da apresentação, para parar de consumir crédito. Apaga também o banco e todos
+Atalho rapido para encerrar a produção. Apaga também o banco e todos
 os dados, sem volta:
 
 ```bash
